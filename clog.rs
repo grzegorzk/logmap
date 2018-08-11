@@ -13,7 +13,9 @@ struct LogFilters {
     line_filters: Vec<Vec<Vec<String>>>,
     // Each unique word from `line_filters` gets its own key
     // Each key stores references to lines containing the key
-    words_hash: HashMap<String, Vec<u32>>
+    words_hash: HashMap<String, Vec<u32>>,
+    // Minimum required consequent matches to consider lines similar
+    min_req_consequent_matches: u32
 }
 
 impl LogFilters {
@@ -23,16 +25,72 @@ impl LogFilters {
 
         LogFilters {
             line_filters: line_filters,
-            words_hash: words_hash
+            words_hash: words_hash,
+            min_req_consequent_matches: 3
         }
     }
 
     fn _update_hash(&mut self, word: &String, filter_index: u32) {
         self.words_hash.entry(word.clone()).or_insert(vec![filter_index]);
         let mut vector_indexes = self.words_hash.get_mut(word).unwrap();
-        vector_indexes.push(filter_index);
-        vector_indexes.sort();
-        vector_indexes.dedup();
+        if ! vector_indexes.contains(&filter_index) {
+            vector_indexes.push(filter_index);
+            vector_indexes.sort();
+        }
+    }
+
+    fn _is_word_in_line_filter(&self, word: &String, filter_index: u32) -> bool {
+        let line_filter = self.line_filters.get(filter_index as usize);
+        if line_filter.is_none() {
+            return false;
+        }
+        
+        let line_filter = line_filter.unwrap();
+        for word_alternatives in line_filter {
+            for word_alternative in word_alternatives {
+                if word_alternative == word {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    fn _count_consequent_matches_in_line_filter(&self, words: &Vec<String>, filter_index: u32) -> u32 {
+        let mut consequent_matches = 0;
+        let mut max_consequent_matches = 0;
+        for word in words {
+            if self._is_word_in_line_filter(word, filter_index) {
+                consequent_matches += 1;
+            }
+            else {
+                if consequent_matches > max_consequent_matches {
+                    max_consequent_matches = consequent_matches;
+                }
+                consequent_matches = 0;
+            }
+        }
+        return consequent_matches;
+    }
+
+    fn _find_best_matching_filter_index(&self, words: &Vec<String>) -> i32 {
+        if self.line_filters.len() == 0 {
+            return -1
+        }
+
+        let mut best_matching_filter_index: i32 = -1;
+        let mut max_consequent_matches = 0;
+        for filter_index in 0..self.line_filters.len() as u32 {
+            let max_cur_consequent_matches = self._count_consequent_matches_in_line_filter(words, filter_index);
+            if max_cur_consequent_matches > max_consequent_matches {
+                max_consequent_matches = max_cur_consequent_matches;
+                best_matching_filter_index = filter_index as i32;
+            }
+        }
+        if max_consequent_matches > self.min_req_consequent_matches {
+            return best_matching_filter_index;
+        }
+        return -1;
     }
 
     fn _add_to_filters(&mut self, log_line: &str) {
@@ -48,23 +106,30 @@ impl LogFilters {
             c == '[' ||
             c == ']');
         let mut words = Vec::new();
-        let expected_index = self.line_filters.len() as u32;
 
         for word in words_iterator {
             let word = word.to_string();
             if word.len() > 0 {
-                self._update_hash(&word, expected_index);
-
-                let word_variations = vec![word];
-                words.push(word_variations);
+                words.push(word);
             }
         }
 
-        self.line_filters.push(words);
-    }
+        let matched_filter_index = self._find_best_matching_filter_index(&words);
+        if matched_filter_index >= 0 {
+            // TODO (add alternative words)
+        }
+        else {
+            let mut words_alternatives = Vec::new();
+            let expected_index = self.line_filters.len() as u32;
 
-    fn _find_best_match(min_consequent_matches: u32) {
-        // TODO
+            for word in words {
+                if word.len() > 0 {
+                    self._update_hash(&word, expected_index);
+                    words_alternatives.push(vec![word]);
+                }
+            }
+            self.line_filters.push(words_alternatives);
+        }
     }
 
     fn learn_line(&mut self, log_line: &str) {
