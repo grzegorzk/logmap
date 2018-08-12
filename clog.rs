@@ -5,11 +5,11 @@ use std::collections::HashMap;
 
 struct LogFilters {
     // Each vector line stores a vector of individual words variations
-    // line_filters (Vec)
+    // line_filters (Vec) - collection of all log lines
     //    |
-    //    |- words (Vec)
+    //    |- words (Vec) - collection of word variations within log line
     //          |
-    //          |- word_variations (Vec)
+    //          |- word_variations (Vec) - collection of words within word variation
     //                   |
     //                   |- word (String)
     line_filters: Vec<Vec<Vec<String>>>,
@@ -177,11 +177,11 @@ impl LogFilters {
         self._add_to_filters(log_line);
     }
 
-    fn save_filters(self){
+    fn save_filters(self) {
         // TODO
     }
 
-    fn load_filters(self){
+    fn load_filters(self) {
         // TODO
     }
 
