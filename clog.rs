@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::io::{self, BufRead};
 use std::collections::HashMap;
 
@@ -32,7 +34,7 @@ impl LogFilters {
 
     fn _update_hash(&mut self, word: &String, filter_index: u32) {
         self.words_hash.entry(word.clone()).or_insert(vec![filter_index]);
-        let mut vector_indexes = self.words_hash.get_mut(word).unwrap();
+        let vector_indexes = self.words_hash.get_mut(word).unwrap();
         if ! vector_indexes.contains(&filter_index) {
             vector_indexes.push(filter_index);
             vector_indexes.sort();
@@ -73,6 +75,45 @@ impl LogFilters {
         return consequent_matches;
     }
 
+    fn _get_line_filter_indexes_with_words(&self, words: &Vec<String>) -> Vec<u32> {
+        let mut line_filters_with_words: Vec<u32> = Vec::new();
+        for word in words {
+            if self.words_hash.get(word).is_some() {
+                let vector_indexes = self.words_hash.get(word).unwrap();
+                line_filters_with_words.extend(vector_indexes);
+            }
+        }
+        line_filters_with_words.sort();
+        return line_filters_with_words;
+    }
+
+    fn _get_line_filter_indexes_with_min_req_matches(&self, words: &Vec<String>) -> Vec<u32> {
+        let mut line_filter_indexes_with_min_req_matches: Vec<u32> = Vec::new();
+        let line_filters_with_words = self._get_line_filter_indexes_with_words(words);
+        let mut matches = 0;
+        let mut prev_index = -1;
+        let mut last_inserted_index = -1;
+        for line_filter_index in line_filters_with_words {
+            if last_inserted_index == line_filter_index as i32 {
+                continue;
+            }
+            if prev_index != line_filter_index as i32 {
+                matches = 1;
+                prev_index = line_filter_index as i32;
+                continue;
+            }
+            else {
+                matches = matches + 1;
+            }
+            if matches == self.min_req_consequent_matches {
+                matches = 0;
+                line_filter_indexes_with_min_req_matches.push(line_filter_index as u32);
+                last_inserted_index = line_filter_index as i32;
+            }
+        }
+        return line_filter_indexes_with_min_req_matches;
+    }
+
     fn _find_best_matching_filter_index(&self, words: &Vec<String>) -> i32 {
         if self.line_filters.len() == 0 {
             return -1
@@ -80,7 +121,7 @@ impl LogFilters {
 
         let mut best_matching_filter_index: i32 = -1;
         let mut max_consequent_matches = 0;
-        for filter_index in 0..self.line_filters.len() as u32 {
+        for filter_index in self._get_line_filter_indexes_with_words(words) {
             let max_cur_consequent_matches = self._count_consequent_matches_in_line_filter(words, filter_index);
             if max_cur_consequent_matches > max_consequent_matches {
                 max_consequent_matches = max_cur_consequent_matches;
@@ -169,9 +210,14 @@ fn main() {
     let std_in = io::stdin();
     let mut log_filters = LogFilters::new();
 
+    let mut icnt = 0;
     for line in std_in.lock().lines() {
         let log_line = line.expect("INVALID INPUT!");
         log_filters.learn_line(&log_line);
+        icnt += 1;
+        if icnt % 1000 == 0 {
+            eprintln!("{}", icnt);
+        }
     }
 
     log_filters.print();
