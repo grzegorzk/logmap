@@ -72,10 +72,10 @@ impl LogFilters {
                 consequent_matches = 0;
             }
         }
-        return consequent_matches;
+        return max_consequent_matches;
     }
 
-    fn _get_line_filter_indexes_with_words(&self, words: &Vec<String>) -> Vec<u32> {
+    fn _get_sorted_line_filter_indexes_with_words(&self, words: &Vec<String>) -> Vec<u32> {
         let mut line_filters_with_words: Vec<u32> = Vec::new();
         for word in words {
             if self.words_hash.get(word).is_some() {
@@ -89,7 +89,7 @@ impl LogFilters {
 
     fn _get_line_filter_indexes_with_min_req_matches(&self, words: &Vec<String>) -> Vec<u32> {
         let mut line_filter_indexes_with_min_req_matches: Vec<u32> = Vec::new();
-        let line_filters_with_words = self._get_line_filter_indexes_with_words(words);
+        let line_filters_with_words = self._get_sorted_line_filter_indexes_with_words(words);
         let mut matches = 0;
         let mut prev_index = -1;
         let mut last_inserted_index = -1;
@@ -121,7 +121,7 @@ impl LogFilters {
 
         let mut best_matching_filter_index: i32 = -1;
         let mut max_consequent_matches = 0;
-        for filter_index in self._get_line_filter_indexes_with_words(words) {
+        for filter_index in self._get_line_filter_indexes_with_min_req_matches(words) {
             let max_cur_consequent_matches = self._count_consequent_matches_in_line_filter(words, filter_index);
             if max_cur_consequent_matches > max_consequent_matches {
                 max_consequent_matches = max_cur_consequent_matches;
@@ -144,6 +144,8 @@ impl LogFilters {
             c == '"' ||
             c == '(' ||
             c == ')' ||
+            c == '{' ||
+            c == '}' ||
             c == '[' ||
             c == ']');
         let mut words = Vec::new();
