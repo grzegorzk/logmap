@@ -64,11 +64,11 @@ impl LogFilters {
         for word in words {
             if self._is_word_in_line_filter(word, filter_index) {
                 consequent_matches += 1;
-            }
-            else {
                 if consequent_matches > max_consequent_matches {
                     max_consequent_matches = consequent_matches;
                 }
+            }
+            else {
                 consequent_matches = 0;
             }
         }
@@ -134,6 +134,11 @@ impl LogFilters {
         return -1;
     }
 
+    fn _is_word_numeric_only(&self, word: &String) -> bool {
+        let chars_are_numeric: Vec<bool> = word.chars().map(|c|c.is_numeric()).collect();
+        return !chars_are_numeric.contains(&false);
+    }
+
     fn _add_to_filters(&mut self, log_line: &str) {
         let words_iterator = log_line.split(|c|
             c == ' ' ||
@@ -152,7 +157,7 @@ impl LogFilters {
 
         for word in words_iterator {
             let word = word.to_string();
-            if word.len() > 0 {
+            if word.len() > 0 && !self._is_word_numeric_only(&word) {
                 words.push(word);
             }
         }
@@ -171,7 +176,9 @@ impl LogFilters {
                     words_alternatives.push(vec![word]);
                 }
             }
-            self.line_filters.push(words_alternatives);
+            if words_alternatives.len() > 0 {
+                self.line_filters.push(words_alternatives);
+            }
         }
     }
 
