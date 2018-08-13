@@ -17,7 +17,9 @@ struct LogFilters {
     // Each key stores references to lines containing the key
     words_hash: HashMap<String, Vec<u32>>,
     // Minimum required consequent matches to consider lines similar
-    min_req_consequent_matches: u32
+    min_req_consequent_matches: u32,
+    // Maximum allowed new alternatives
+    max_allowed_new_alternatives: u32,
 }
 
 impl LogFilters {
@@ -28,7 +30,8 @@ impl LogFilters {
         LogFilters {
             line_filters: line_filters,
             words_hash: words_hash,
-            min_req_consequent_matches: 3
+            min_req_consequent_matches: 3,
+            max_allowed_new_alternatives: 2
         }
     }
 
@@ -61,6 +64,8 @@ impl LogFilters {
     fn _count_consequent_matches_in_line_filter(&self, words: &Vec<String>, filter_index: u32) -> u32 {
         let mut consequent_matches = 0;
         let mut max_consequent_matches = 0;
+        let mut new_alternatives = 0;
+
         for word in words {
             if self._is_word_in_line_filter(word, filter_index) {
                 consequent_matches += 1;
@@ -69,6 +74,10 @@ impl LogFilters {
                 }
             }
             else {
+                new_alternatives += 1;
+                if new_alternatives > self.max_allowed_new_alternatives {
+                    return 0;
+                }
                 consequent_matches = 0;
             }
         }
@@ -128,10 +137,36 @@ impl LogFilters {
                 best_matching_filter_index = filter_index as i32;
             }
         }
-        if max_consequent_matches > self.min_req_consequent_matches {
-            return best_matching_filter_index;
+        if words.len() > self.min_req_consequent_matches as usize {
+            if max_consequent_matches >= self.min_req_consequent_matches {
+                return best_matching_filter_index;
+            }
+        }
+        else {
+            if words.len() == max_consequent_matches as usize {
+                return best_matching_filter_index;
+            }
         }
         return -1;
+    }
+
+    fn _update_line_filter(&mut self, words: Vec<String>, filter_index: u32) {
+        // TODO
+    }
+
+    fn _add_new_line_filter(&mut self, words: Vec<String>) {
+        let mut words_alternatives = Vec::new();
+        let expected_index = self.line_filters.len() as u32;
+
+        for word in words {
+            if word.len() > 0 {
+                self._update_hash(&word, expected_index);
+                words_alternatives.push(vec![word]);
+            }
+        }
+        if words_alternatives.len() > 0 {
+            self.line_filters.push(words_alternatives);
+        }
     }
 
     fn _is_word_numeric_only(&self, word: &String) -> bool {
@@ -164,21 +199,10 @@ impl LogFilters {
 
         let matched_filter_index = self._find_best_matching_filter_index(&words);
         if matched_filter_index >= 0 {
-            // TODO (add alternative words)
+            self._update_line_filter(words, matched_filter_index as u32);
         }
         else {
-            let mut words_alternatives = Vec::new();
-            let expected_index = self.line_filters.len() as u32;
-
-            for word in words {
-                if word.len() > 0 {
-                    self._update_hash(&word, expected_index);
-                    words_alternatives.push(vec![word]);
-                }
-            }
-            if words_alternatives.len() > 0 {
-                self.line_filters.push(words_alternatives);
-            }
+            self._add_new_line_filter(words);
         }
     }
 
