@@ -5,15 +5,15 @@ use std::collections::HashMap;
 
 struct LogFilters {
     // Each vector line stores a vector of individual words variations
-    // line_filters (Vec) - collection of all log lines
+    // filters (Vec) - collection of all log lines
     //    |
     //    |- words (Vec) - collection of word variations within log line
     //          |
     //          |- word_variations (Vec) - collection of words within word variation
     //                   |
     //                   |- word (String)
-    line_filters: Vec<Vec<Vec<String>>>,
-    // Each unique word from `line_filters` gets its own key
+    filters: Vec<Vec<Vec<String>>>,
+    // Each unique word from `filters` gets its own key
     // Each key stores references to lines containing the key
     words_hash: HashMap<String, Vec<u32>>,
     // Minimum required consequent matches to consider lines similar
@@ -24,11 +24,11 @@ struct LogFilters {
 
 impl LogFilters {
     fn new() -> Self {
-        let line_filters = Vec::new();
+        let filters = Vec::new();
         let words_hash = HashMap::new();
 
         LogFilters {
-            line_filters: line_filters,
+            filters: filters,
             words_hash: words_hash,
             min_req_consequent_matches: 3,
             max_allowed_new_alternatives: 2
@@ -44,14 +44,14 @@ impl LogFilters {
         }
     }
 
-    fn _is_word_in_line_filter(&self, word: &String, filter_index: u32) -> bool {
-        let line_filter = self.line_filters.get(filter_index as usize);
-        if line_filter.is_none() {
+    fn _is_word_in_filter(&self, word: &String, filter_index: u32) -> bool {
+        let filter = self.filters.get(filter_index as usize);
+        if filter.is_none() {
             return false;
         }
         
-        let line_filter = line_filter.unwrap();
-        for word_alternatives in line_filter {
+        let filter = filter.unwrap();
+        for word_alternatives in filter {
             for word_alternative in word_alternatives {
                 if word_alternative == word {
                     return true;
@@ -61,13 +61,13 @@ impl LogFilters {
         return false;
     }
 
-    fn _count_consequent_matches_in_line_filter(&self, words: &Vec<String>, filter_index: u32) -> u32 {
+    fn _count_consequent_matches_in_filter(&self, words: &Vec<String>, filter_index: u32) -> u32 {
         let mut consequent_matches = 0;
         let mut max_consequent_matches = 0;
         let mut new_alternatives = 0;
 
         for word in words {
-            if self._is_word_in_line_filter(word, filter_index) {
+            if self._is_word_in_filter(word, filter_index) {
                 consequent_matches += 1;
                 if consequent_matches > max_consequent_matches {
                     max_consequent_matches = consequent_matches;
@@ -84,31 +84,31 @@ impl LogFilters {
         return max_consequent_matches;
     }
 
-    fn _get_sorted_line_filter_indexes_with_words(&self, words: &Vec<String>) -> Vec<u32> {
-        let mut line_filters_with_words: Vec<u32> = Vec::new();
+    fn _get_sorted_filter_indexes_containing_words(&self, words: &Vec<String>) -> Vec<u32> {
+        let mut filters_with_words: Vec<u32> = Vec::new();
         for word in words {
             if self.words_hash.get(word).is_some() {
                 let vector_indexes = self.words_hash.get(word).unwrap();
-                line_filters_with_words.extend(vector_indexes);
+                filters_with_words.extend(vector_indexes);
             }
         }
-        line_filters_with_words.sort();
-        return line_filters_with_words;
+        filters_with_words.sort();
+        return filters_with_words;
     }
 
-    fn _get_line_filter_indexes_with_min_req_matches(&self, words: &Vec<String>) -> Vec<u32> {
-        let mut line_filter_indexes_with_min_req_matches: Vec<u32> = Vec::new();
-        let line_filters_with_words = self._get_sorted_line_filter_indexes_with_words(words);
+    fn _get_filter_indexes_with_min_req_matches(&self, words: &Vec<String>) -> Vec<u32> {
+        let mut filter_indexes_with_min_req_matches: Vec<u32> = Vec::new();
+        let filters_with_words = self._get_sorted_filter_indexes_containing_words(words);
         let mut matches = 0;
         let mut prev_index = -1;
         let mut last_inserted_index = -1;
-        for line_filter_index in line_filters_with_words {
-            if last_inserted_index == line_filter_index as i32 {
+        for filter_index in filters_with_words {
+            if last_inserted_index == filter_index as i32 {
                 continue;
             }
-            if prev_index != line_filter_index as i32 {
+            if prev_index != filter_index as i32 {
                 matches = 1;
-                prev_index = line_filter_index as i32;
+                prev_index = filter_index as i32;
                 continue;
             }
             else {
@@ -116,22 +116,22 @@ impl LogFilters {
             }
             if matches == self.min_req_consequent_matches {
                 matches = 0;
-                line_filter_indexes_with_min_req_matches.push(line_filter_index as u32);
-                last_inserted_index = line_filter_index as i32;
+                filter_indexes_with_min_req_matches.push(filter_index as u32);
+                last_inserted_index = filter_index as i32;
             }
         }
-        return line_filter_indexes_with_min_req_matches;
+        return filter_indexes_with_min_req_matches;
     }
 
     fn _find_best_matching_filter_index(&self, words: &Vec<String>) -> i32 {
-        if self.line_filters.len() == 0 {
+        if self.filters.len() == 0 {
             return -1
         }
 
         let mut best_matching_filter_index: i32 = -1;
         let mut max_consequent_matches = 0;
-        for filter_index in self._get_line_filter_indexes_with_min_req_matches(words) {
-            let max_cur_consequent_matches = self._count_consequent_matches_in_line_filter(words, filter_index);
+        for filter_index in self._get_filter_indexes_with_min_req_matches(words) {
+            let max_cur_consequent_matches = self._count_consequent_matches_in_filter(words, filter_index);
             if max_cur_consequent_matches > max_consequent_matches {
                 max_consequent_matches = max_cur_consequent_matches;
                 best_matching_filter_index = filter_index as i32;
@@ -150,13 +150,13 @@ impl LogFilters {
         return -1;
     }
 
-    fn _update_line_filter(&mut self, words: Vec<String>, filter_index: u32) {
+    fn _update_filter(&mut self, words: Vec<String>, filter_index: u32) {
         // TODO
     }
 
-    fn _add_new_line_filter(&mut self, words: Vec<String>) {
+    fn _add_filter(&mut self, words: Vec<String>) {
         let mut words_alternatives = Vec::new();
-        let expected_index = self.line_filters.len() as u32;
+        let expected_index = self.filters.len() as u32;
 
         for word in words {
             if word.len() > 0 {
@@ -165,11 +165,11 @@ impl LogFilters {
             }
         }
         if words_alternatives.len() > 0 {
-            self.line_filters.push(words_alternatives);
+            self.filters.push(words_alternatives);
         }
     }
 
-    fn _is_word_numeric_only(&self, word: &String) -> bool {
+    fn _is_word_only_numeric(&self, word: &String) -> bool {
         let chars_are_numeric: Vec<bool> = word.chars().map(|c|c.is_numeric()).collect();
         return !chars_are_numeric.contains(&false);
     }
@@ -192,17 +192,17 @@ impl LogFilters {
 
         for word in words_iterator {
             let word = word.to_string();
-            if word.len() > 0 && !self._is_word_numeric_only(&word) {
+            if word.len() > 0 && !self._is_word_only_numeric(&word) {
                 words.push(word);
             }
         }
 
         let matched_filter_index = self._find_best_matching_filter_index(&words);
         if matched_filter_index >= 0 {
-            self._update_line_filter(words, matched_filter_index as u32);
+            self._update_filter(words, matched_filter_index as u32);
         }
         else {
-            self._add_new_line_filter(words);
+            self._add_filter(words);
         }
     }
 
@@ -219,8 +219,8 @@ impl LogFilters {
     }
 
     fn print(self) {
-        if self.line_filters.len() > 0 {
-            for elem in self.line_filters {
+        if self.filters.len() > 0 {
+            for elem in self.filters {
                 println!("{:?}", elem);
             }
         }
