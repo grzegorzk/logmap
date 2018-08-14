@@ -31,7 +31,7 @@ impl LogFilters {
             filters: filters,
             words_hash: words_hash,
             min_req_consequent_matches: 3,
-            max_allowed_new_alternatives: 2
+            max_allowed_new_alternatives: 1
         }
     }
 
@@ -150,8 +150,33 @@ impl LogFilters {
         return -1;
     }
 
-    fn _update_filter(&mut self, words: Vec<String>, filter_index: u32) {
-        // TODO
+    fn _is_word_in_word_alternatives(word: &String, word_alternatives: &Vec<String>) -> bool {
+        for word_alternative in word_alternatives {
+            if word_alternative == word {
+                return true;
+            }
+        }
+        return false
+    }
+
+    fn _update_filter(&mut self, words: Vec<String>, filter_index: usize) {
+        if words.len() > 0 && self.filters.get(filter_index).is_some() {
+            let filters = self.filters.get_mut(filter_index).unwrap();
+            for icnt in 0..words.len() {
+                let word = words.get(icnt).unwrap();
+                if filters.get(icnt).is_some() {
+                    let mut word_alternatives = filters.get_mut(icnt).unwrap();
+                    if LogFilters::_is_word_in_word_alternatives(word, word_alternatives ) {
+                        continue;
+                    }
+                    word_alternatives.push(word.to_string());
+                }
+                else
+                {
+                    filters.push(vec![word.to_string()]);
+                }
+            }
+        }
     }
 
     fn _add_filter(&mut self, words: Vec<String>) {
@@ -174,7 +199,7 @@ impl LogFilters {
         return !chars_are_numeric.contains(&false);
     }
 
-    fn _add_to_filters(&mut self, log_line: &str) {
+    fn learn_line(&mut self, log_line: &str) {
         let words_iterator = log_line.split(|c|
             c == ' ' ||
             c == '/' ||
@@ -199,15 +224,11 @@ impl LogFilters {
 
         let matched_filter_index = self._find_best_matching_filter_index(&words);
         if matched_filter_index >= 0 {
-            self._update_filter(words, matched_filter_index as u32);
+            self._update_filter(words, matched_filter_index as usize);
         }
         else {
             self._add_filter(words);
         }
-    }
-
-    fn learn_line(&mut self, log_line: &str) {
-        self._add_to_filters(log_line);
     }
 
     fn save_filters(self) {
