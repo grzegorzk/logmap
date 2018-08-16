@@ -294,3 +294,18 @@ impl LogFilters {
         return false;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn _is_word_only_numeric() {
+        let log_filters = LogFilters::new();
+        assert_eq!(log_filters._is_word_only_numeric(&"asdf".to_string()), false);
+        assert_eq!(log_filters._is_word_only_numeric(&"123a".to_string()), false);
+        assert_eq!(log_filters._is_word_only_numeric(&"a123".to_string()), false);
+        assert_eq!(log_filters._is_word_only_numeric(&"6789".to_string()), true);
+        assert_eq!(log_filters._is_word_only_numeric(&"".to_string()), true);
+    }
+}
