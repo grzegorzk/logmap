@@ -87,7 +87,7 @@ impl LogFilters {
 
         let matched_filter_index = self._find_best_matching_filter_index(&words);
         if matched_filter_index >= 0 {
-            self._update_filter(words, matched_filter_index as usize);
+            self._update_filter(words, matched_filter_index as u32);
         }
         else {
             self._add_filter(words);
@@ -107,7 +107,7 @@ impl LogFilters {
         let mut best_matching_filter_index: i32 = -1;
         let mut max_consequent_matches = 0;
         for filter_index in self._get_filter_indexes_with_min_req_matches(words) {
-            let max_cur_consequent_matches = self._count_consequent_matches_in_filter(words, filter_index);
+            let max_cur_consequent_matches = self._count_consequent_matches(words, filter_index);
             if max_cur_consequent_matches > max_consequent_matches {
                 max_consequent_matches = max_cur_consequent_matches;
                 best_matching_filter_index = filter_index as i32;
@@ -165,56 +165,92 @@ impl LogFilters {
         return filters_with_words;
     }
 
-    fn _count_consequent_matches_in_filter(&self, words: &Vec<String>, filter_index: u32) -> u32 {
+    fn _count_consequent_matches(&self, words: &Vec<String>, filter_index: u32) -> u32 {
         let mut consequent_matches = 0;
         let mut max_consequent_matches = 0;
         let mut new_alternatives = 0;
 
+        let mut extra_allowed_new_alternatives = 0;
+        let filter_length = self.filters.get(filter_index as usize).unwrap().len();
+        if filter_length < words.len() {
+            extra_allowed_new_alternatives = (words.len() - filter_length) as u32;
+        }
+
         for word in words {
-            if self._is_word_in_filter(word, filter_index) {
+            // TODO: consequent matches in filter should be ensured too
+            if self._get_word_index_in_filter(word, filter_index) >= 0 {
                 consequent_matches += 1;
                 if consequent_matches > max_consequent_matches {
                     max_consequent_matches = consequent_matches;
                 }
             }
+            // TODO: handle situation if words contains more elements than filter
             else {
                 new_alternatives += 1;
-                if new_alternatives > self.max_allowed_new_alternatives {
+                consequent_matches = 0;
+                if new_alternatives > self.max_allowed_new_alternatives + extra_allowed_new_alternatives {
                     return 0;
                 }
-                consequent_matches = 0;
             }
         }
         return max_consequent_matches;
     }
 
-    fn _update_filter(&mut self, words: Vec<String>, filter_index: usize) {
-        if words.len() > 0 && self.filters.get(filter_index).is_some() {
-            let filters = self.filters.get_mut(filter_index).unwrap();
-            for icnt in 0..words.len() {
-                let word = words.get(icnt).unwrap();
-                if filters.get(icnt).is_some() {
-                    let mut word_alternatives = filters.get_mut(icnt).unwrap();
-                    if LogFilters::_is_word_in_word_alternatives(word, word_alternatives ) {
-                        continue;
-                    }
-                    word_alternatives.push(word.to_string());
-                }
-                else
-                {
-                    filters.push(vec![word.to_string()]);
-                }
+    fn _get_word_index_in_filter(&self, word: &String, filter_index: u32) -> i32 {
+        let filter = self.filters.get(filter_index as usize);
+        if filter.is_none() {
+            return -1;
+        }
+
+        let filter = filter.unwrap();
+        for word_alternative_index in 0..filter.len() {
+            if filter.get(word_alternative_index).unwrap().contains(word) {
+                return word_alternative_index as i32;
             }
+        }
+        return -1;
+    }
+
+    fn _update_filter(&mut self, words: Vec<String>, filter_index: u32) {
+        self._normalise_till_first_match(&words, filter_index);
+        for word in words {
         }
     }
 
-    fn _is_word_in_word_alternatives(word: &String, word_alternatives: &Vec<String>) -> bool {
-        for word_alternative in word_alternatives {
-            if word_alternative == word {
-                return true;
+    fn _normalise_till_first_match(&mut self, words: &Vec<String>, filter_index: u32) {
+        let (first_word, first_filter) = self._get_first_matching_indexes(&words, filter_index);
+        if first_word >= 0 && first_filter >= 0 {
+            if first_word - first_filter > 0 {
+                let mut front_words = Vec::new();
+                for word in &words[0..(first_word - first_filter) as usize] {
+                    self._update_hash(&word, filter_index);
+                    front_words.push(vec![word.clone()]);
+                }
+                let filters = self.filters.get_mut(filter_index as usize).unwrap();
+                filters.splice(0..0, front_words);
             }
         }
-        return false
+        else {
+            // This should never happen
+            // TODO: consider throw rather than log?
+            eprintln!("Words not matching selected filter during filter update; '{:?}'", words);
+        }
+    }
+
+    fn _get_first_matching_indexes(&self, words: &Vec<String>, filter_index: u32) -> (i32, i32) {
+        if words.len() == 0 || self.filters.get(filter_index as usize).is_none() {
+            return (-1, -1);
+        }
+
+        for word_index in 0..words.len() {
+            let word = words.get(word_index).unwrap();
+            let matching_filter_index = self._get_word_index_in_filter(word, filter_index);
+            if  matching_filter_index > 0 {
+                return (word_index as i32, matching_filter_index);
+            }
+        }
+
+        return (-1, -1);
     }
 
     fn _add_filter(&mut self, words: Vec<String>) {
