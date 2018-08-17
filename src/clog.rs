@@ -162,6 +162,7 @@ impl LogFilters {
             }
         }
         filters_with_words.sort();
+        filters_with_words.dedup();
         return filters_with_words;
     }
 
@@ -299,6 +300,70 @@ impl LogFilters {
 mod tests {
     use super::*;
 
+    fn _simple_filter_from_string(words: &str) -> Vec<Vec<String>> {
+        // TODO: below must be kept in sync with LogFilters::learn_line
+        let words_iterator = words.split(|c|
+            c == ' ' ||
+            c == '/' ||
+            c == ',' ||
+            c == '.' ||
+            c == ':' ||
+            c == '"' ||
+            c == '(' ||
+            c == ')' ||
+            c == '{' ||
+            c == '}' ||
+            c == '[' ||
+            c == ']');
+
+        let mut filter = Vec::new();
+        for word in words_iterator {
+            let word = word.to_string();
+            filter.push(vec![word]);
+        }
+        return filter;
+    }
+
+    fn _add_word_alternative(mut filter: Vec<Vec<String>>, index: usize, word: &str) -> Vec<Vec<String>> {
+        if filter.get(index).is_some() {
+            filter.get_mut(index).unwrap().push(word.to_string());
+            return filter;
+        }
+        else
+        {
+            panic!("Failed to create test data! Extending {:?} at {}", filter, index);
+        }
+    }
+
+    fn _add_test_filter(test_filters: &mut LogFilters, filter: Vec<Vec<String>>) {
+        let next_filter_index = test_filters.filters.len() as u32;
+        for word_alternatives in &filter {
+            for word in word_alternatives {
+                if test_filters.words_hash.get(word).is_some() {
+                    let filter_indexes = test_filters.words_hash.get_mut(word).unwrap();
+                    if !filter_indexes.contains(&next_filter_index) {
+                        filter_indexes.push(next_filter_index);
+                    }
+                }
+                else {
+                    test_filters.words_hash.insert(word.clone(), vec![next_filter_index]);
+                }
+            }
+        }
+        test_filters.filters.push(filter);
+    }
+
+    fn _init_test_data() -> LogFilters {
+        let mut log_filters = LogFilters::new();
+        _add_test_filter(&mut log_filters, _simple_filter_from_string("aaa bbb ccc ddd"));
+        _add_test_filter(&mut log_filters, _simple_filter_from_string("eee fff ggg hhh x y z"));
+        _add_test_filter(&mut log_filters, _simple_filter_from_string("iii jjj kkk lll"));
+        _add_test_filter(&mut log_filters, _simple_filter_from_string("mmm nnn ooo ppp"));
+        _add_test_filter(&mut log_filters, _add_word_alternative(
+            _simple_filter_from_string("qqq rrr sss ttt"), 3, "aaa"));
+        return log_filters;
+    }
+
     #[test]
     fn _is_word_only_numeric() {
         let log_filters = LogFilters::new();
@@ -307,5 +372,49 @@ mod tests {
         assert_eq!(log_filters._is_word_only_numeric(&"a123".to_string()), false);
         assert_eq!(log_filters._is_word_only_numeric(&"6789".to_string()), true);
         assert_eq!(log_filters._is_word_only_numeric(&"".to_string()), true);
+    }
+
+    #[test]
+    fn _get_sorted_filter_indexes_containing_words() {
+        let log_filters = LogFilters::new();
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![]);
+        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&vec![]), vec![]);
+
+        let log_filters = _init_test_data();
+        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&vec![]), vec![]);
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![0, 4]);
+        let words = vec!["aaa".to_string(), "xxx".to_string()];
+        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![0, 4]);
+        let words = vec!["xxx".to_string()];
+        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![]);
+    }
+
+    #[test]
+    fn _get_word_index_in_filter() {
+        let log_filters = LogFilters::new();
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 0), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 100), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"".to_string(), 0), -1);
+
+        let log_filters = _init_test_data();
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 0), 0);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 4), 3);
+        assert_eq!(log_filters._get_word_index_in_filter(&"".to_string(), 4), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 1), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 100), -1);
+    }
+
+    #[test]
+    fn _is_word_in_filter() {
+        let log_filters = _init_test_data();
+        assert_eq!(log_filters._is_word_in_filter(&"aaa".to_string(), 0), true);
+        assert_eq!(log_filters._is_word_in_filter(&"aaa".to_string(), 4), true);
+        assert_eq!(log_filters._is_word_in_filter(&"hhh".to_string(), 1), true);
+        assert_eq!(log_filters._is_word_in_filter(&"aaa".to_string(), 1), false);
+        assert_eq!(log_filters._is_word_in_filter(&"xxx".to_string(), 2), false);
+        assert_eq!(log_filters._is_word_in_filter(&"xxx".to_string(), 100), false);
+        assert_eq!(log_filters._is_word_in_filter(&"".to_string(), 0), false);
     }
 }
