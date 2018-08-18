@@ -167,6 +167,9 @@ impl LogFilters {
     }
 
     fn _count_consequent_matches(&self, words: &Vec<String>, filter_index: u32) -> u32 {
+        if self.filters.len() <= filter_index as usize {
+            return 0;
+        }
         let mut consequent_matches = 0;
         let mut max_consequent_matches = 0;
         let mut new_alternatives = 0;
@@ -177,18 +180,19 @@ impl LogFilters {
             extra_allowed_new_alternatives = (words.len() - filter_length) as u32;
         }
 
+        let mut last_matching_index = -1;
         for word in words {
-            // TODO: consequent matches in filter should be ensured too
-            if self._get_word_index_in_filter(word, filter_index) >= 0 {
+            let mathing_index = self._get_word_index_in_filter(word, filter_index);
+            // TODO: handle same words in a row (i.e. "aaa aaa aaa")
+            if mathing_index >= 0 && mathing_index > last_matching_index {
+                last_matching_index = mathing_index;
                 consequent_matches += 1;
                 if consequent_matches > max_consequent_matches {
                     max_consequent_matches = consequent_matches;
                 }
             }
-            // TODO: handle situation if words contains more elements than filter
             else {
                 new_alternatives += 1;
-                consequent_matches = 0;
                 if new_alternatives > self.max_allowed_new_alternatives + extra_allowed_new_alternatives {
                     return 0;
                 }
@@ -355,7 +359,11 @@ mod tests {
 
     fn _init_test_data() -> LogFilters {
         let mut log_filters = LogFilters::new();
-        _add_test_filter(&mut log_filters, _simple_filter_from_string("aaa bbb ccc ddd"));
+        let mut complex_filter = _simple_filter_from_string("aaa qqq ccc sss");
+        complex_filter = _add_word_alternative(complex_filter, 1, "bbb");
+        complex_filter = _add_word_alternative(complex_filter, 2, "rrr");
+        complex_filter = _add_word_alternative(complex_filter, 3, "ddd");
+        _add_test_filter(&mut log_filters, complex_filter);
         _add_test_filter(&mut log_filters, _simple_filter_from_string("eee fff ggg hhh x y z"));
         _add_test_filter(&mut log_filters, _simple_filter_from_string("iii jjj kkk lll"));
         _add_test_filter(&mut log_filters, _simple_filter_from_string("mmm nnn ooo ppp"));
@@ -389,6 +397,71 @@ mod tests {
         assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![0, 4]);
         let words = vec!["xxx".to_string()];
         assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![]);
+    }
+
+    #[test]
+    fn _count_consequent_matches() {
+        // Test if method was used on empty data structure
+        let mut log_filters = LogFilters::new();
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 0), 0);
+        assert_eq!(log_filters._count_consequent_matches(&words, 1), 0);
+        assert_eq!(log_filters._count_consequent_matches(&vec![], 0), 0);
+        log_filters.max_allowed_new_alternatives = 0;
+        assert_eq!(log_filters._count_consequent_matches(&words, 0), 0);
+        assert_eq!(log_filters._count_consequent_matches(&words, 1), 0);
+        assert_eq!(log_filters._count_consequent_matches(&vec![], 0), 0);
+
+        let mut log_filters = _init_test_data();
+        log_filters.max_allowed_new_alternatives = 1;
+        // Test for existing pattern
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 0), 4);
+        assert_eq!(log_filters._count_consequent_matches(&words, 1), 0);
+        // Test out of bounds
+        assert_eq!(log_filters._count_consequent_matches(&words, 5), 0);
+        // Test empty words vector
+        assert_eq!(log_filters._count_consequent_matches(&vec![], 0), 0);
+        // Test if words vector can be smaller than filter
+        let words = vec!["iii".to_string(), "jjj".to_string(), "lll".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 2), 3);
+        let words = vec!["iii".to_string(), "lll".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 2), 2);
+        let words = vec!["iii".to_string(), "jjj".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 2), 2);
+        let words = vec!["jjj".to_string(), "kkk".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 2), 2);
+        let words = vec!["iii".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 2), 1);
+        let words = vec!["jjj".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 2), 1);
+        // Test if word alternative will be matched
+        let words = vec!["aaa".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 4), 1);
+        // Test if 1 word alternative is allowed
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "xxx".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 0), 3);
+        let words = vec!["aaa".to_string(), "xxx".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 0), 3);
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "zzz".to_string(), "xxx".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 0), 0);
+        let words = vec!["aaa".to_string(), "xxx".to_string(), "zzz".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 0), 0);
+        // Test if words vector can be longer than existing filter
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string(),
+            "eee".to_string(), "fff".to_string(), "ggg".to_string(), "hhh".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 0), 4);
+        // Test if longer words vector will be allowed to contain 1 word alternative to existing word
+        let words = vec!["aaa".to_string(), "xxx".to_string(), "ccc".to_string(), "ddd".to_string(),
+            "eee".to_string(), "fff".to_string(), "ggg".to_string(), "hhh".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 3), 0);
+        // Test if longer words vector will be allowed to contain 1 new word alternative
+        let words = vec!["aaa".to_string(), "xxx".to_string(), "bbb".to_string(), "ccc".to_string(),
+            "ddd".to_string(), "fff".to_string(), "ggg".to_string(), "hhh".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 4), 0);
+        // Test if words vector and filter vector must contain words in the same order
+        let words = vec!["ddd".to_string(), "ccc".to_string(), "bbb".to_string(), "aaa".to_string()];
+        assert_eq!(log_filters._count_consequent_matches(&words, 0), 0);
     }
 
     #[test]
