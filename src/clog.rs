@@ -270,26 +270,30 @@ impl LogFilters {
     }
 
     fn _add_filter(&mut self, words: Vec<String>) {
-        let mut words_alternatives = Vec::new();
-        let expected_index = self.filters.len() as u32;
+        let mut new_filter = Vec::new();
+        let expected_index = self.filters.len() as u32 - 1;
 
         for word in words {
             if word.len() > 0 {
-                self._update_hash(&word, expected_index);
-                words_alternatives.push(vec![word]);
+                new_filter.push(vec![word]);
             }
         }
-        if words_alternatives.len() > 0 {
-            self.filters.push(words_alternatives);
+        if new_filter.len() > 0 {
+            self.filters.push(new_filter.clone());
+            for word_alternatives in new_filter {
+                self._update_hash(&word_alternatives[0], expected_index);
+            }
         }
     }
 
     fn _update_hash(&mut self, word: &String, filter_index: u32) {
-        self.words_hash.entry(word.clone()).or_insert(vec![filter_index]);
-        let vector_indexes = self.words_hash.get_mut(word).unwrap();
-        if ! vector_indexes.contains(&filter_index) {
-            vector_indexes.push(filter_index);
-            vector_indexes.sort();
+        if self._is_word_in_filter(word, filter_index) {
+            self.words_hash.entry(word.clone()).or_insert(vec![filter_index]);
+            let vector_indexes = self.words_hash.get_mut(word).unwrap();
+            if !vector_indexes.contains(&filter_index) {
+                vector_indexes.push(filter_index);
+                vector_indexes.sort();
+            }
         }
     }
 
@@ -596,6 +600,39 @@ mod tests {
         // Test when word does not exist in filter or filter does not exist
         assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 1, 0), -1);
         assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), log_filters.filters.len() as u32, 0), -1);
+    }
+
+    #[test]
+    fn _update_hash() {
+        // Test what happens if method was used on empty data structure
+        let mut log_filters = LogFilters::new();
+        let word = "xxx".to_string();
+        log_filters._update_hash(&word, 0);
+        assert_eq!(log_filters.words_hash.get(&word).is_some(), false);
+
+        let mut log_filters = _init_test_data();
+        // Trying to add a word not found in any filter
+        let word = "xyz".to_string();
+        log_filters._update_hash(&word, 0);
+        assert_eq!(log_filters.words_hash.get(&word).is_some(), false);
+        // Trying to add already existing word should change nothing
+        let word = "aaa".to_string();
+        assert_eq!(log_filters.words_hash.get(&word).unwrap(), &vec![0, 4, 5]);
+        log_filters._update_hash(&word, 0);
+        assert_eq!(log_filters.words_hash.get(&word).unwrap(), &vec![0, 4, 5]);
+        // Adding new word to hash just after new filter was added
+        let word = "xyz".to_string();
+        log_filters.filters.push(vec![vec![word.clone()]]);
+        let last_index = log_filters.filters.len() as u32 - 1;
+        assert_eq!(log_filters.words_hash.get(&word).is_some(), false);
+        log_filters._update_hash(&word, last_index);
+        assert_eq!(log_filters.words_hash.get(&word).unwrap(), &vec![last_index]);
+        // Adding new word to hash when extending existing filter
+        let word = "iii".to_string();
+        log_filters.filters[0].push(vec![word.clone()]);
+        assert_eq!(log_filters.words_hash.get(&word).unwrap(), &vec![2]);
+        log_filters._update_hash(&word, 0);
+        assert_eq!(log_filters.words_hash.get(&word).unwrap(), &vec![0, 2]);
     }
 
     #[test]
