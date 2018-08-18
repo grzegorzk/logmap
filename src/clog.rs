@@ -182,8 +182,7 @@ impl LogFilters {
 
         let mut last_matching_index = -1;
         for word in words {
-            let mathing_index = self._get_word_index_in_filter(word, filter_index);
-            // TODO: handle same words in a row (i.e. "aaa aaa aaa")
+            let mathing_index = self._get_word_index_in_filter(word, filter_index, (last_matching_index + 1) as u32);
             if mathing_index >= 0 && mathing_index > last_matching_index {
                 last_matching_index = mathing_index;
                 consequent_matches += 1;
@@ -201,14 +200,23 @@ impl LogFilters {
         return max_consequent_matches;
     }
 
-    fn _get_word_index_in_filter(&self, word: &String, filter_index: u32) -> i32 {
+    fn _get_word_index_in_filter(&self, word: &String, filter_index: u32, start_from_word: u32) -> i32 {
+        if word.len() == 0 {
+            return -1;
+        }
+
         let filter = self.filters.get(filter_index as usize);
         if filter.is_none() {
             return -1;
         }
 
+        let start_from_word = start_from_word as usize;
         let filter = filter.unwrap();
-        for word_alternative_index in 0..filter.len() {
+        if filter.len() == 0 || filter.len() - 1 < start_from_word {
+            return -1;
+        }
+
+        for word_alternative_index in start_from_word..filter.len() {
             if filter.get(word_alternative_index).unwrap().contains(word) {
                 return word_alternative_index as i32;
             }
@@ -249,8 +257,8 @@ impl LogFilters {
 
         for word_index in 0..words.len() {
             let word = words.get(word_index).unwrap();
-            let matching_filter_index = self._get_word_index_in_filter(word, filter_index);
-            if  matching_filter_index > 0 {
+            let matching_filter_index = self._get_word_index_in_filter(word, filter_index, 0);
+            if  matching_filter_index >= 0 {
                 return (word_index as i32, matching_filter_index);
             }
         }
@@ -401,7 +409,7 @@ mod tests {
 
     #[test]
     fn _count_consequent_matches() {
-        // Test if method was used on empty data structure
+        // Test what happens if method was used on empty data structure
         let mut log_filters = LogFilters::new();
         let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
         assert_eq!(log_filters._count_consequent_matches(&words, 0), 0);
@@ -466,17 +474,27 @@ mod tests {
 
     #[test]
     fn _get_word_index_in_filter() {
+        // Test what happens if method was used on empty data structure
         let log_filters = LogFilters::new();
-        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 0), -1);
-        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 100), -1);
-        assert_eq!(log_filters._get_word_index_in_filter(&"".to_string(), 0), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 0, 0), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 0, 100), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 100, 0), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"".to_string(), 0, 0), -1);
 
         let log_filters = _init_test_data();
-        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 0), 0);
-        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 4), 3);
-        assert_eq!(log_filters._get_word_index_in_filter(&"".to_string(), 4), -1);
-        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 1), -1);
-        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 100), -1);
+        // Test if word will be matched when it should be
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 0, 0), 0);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 4, 0), 3);
+        assert_eq!(log_filters._get_word_index_in_filter(&"qqq".to_string(), 0, 0), 1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"sss".to_string(), 0, 3), 3);
+        assert_eq!(log_filters._get_word_index_in_filter(&"ddd".to_string(), 0, 3), 3);
+        // Test if word will not be matched if starting index is higher than word index in filter
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 0, 1), -1);
+        // Empty string should not be matched
+        assert_eq!(log_filters._get_word_index_in_filter(&"".to_string(), 4, 0), -1);
+        // Test when word does not exist in filter or filter does not exist
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 1, 0), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 100, 0), -1);
     }
 
     #[test]
