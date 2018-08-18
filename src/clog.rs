@@ -100,7 +100,7 @@ impl LogFilters {
     }
 
     fn _find_best_matching_filter_index(&self, words: &Vec<String>) -> i32 {
-        if self.filters.len() == 0 {
+        if self.filters.len() == 0 || words.len() == 0 as usize {
             return -1
         }
 
@@ -139,12 +139,16 @@ impl LogFilters {
             if prev_index != filter_index as i32 {
                 matches = 1;
                 prev_index = filter_index as i32;
-                continue;
             }
             else {
                 matches = matches + 1;
             }
-            if matches == self.min_req_consequent_matches {
+
+            let mut extra_allowed_new_alternatives = 0;
+            if words.len() < self.min_req_consequent_matches as usize {
+                extra_allowed_new_alternatives = self.min_req_consequent_matches - words.len() as u32;
+            }
+            if matches >= self.min_req_consequent_matches - self.max_allowed_new_alternatives - extra_allowed_new_alternatives {
                 matches = 0;
                 filter_indexes_with_min_req_matches.push(filter_index as u32);
                 last_inserted_index = filter_index as i32;
@@ -162,12 +166,11 @@ impl LogFilters {
             }
         }
         filters_with_words.sort();
-        filters_with_words.dedup();
         return filters_with_words;
     }
 
     fn _count_consequent_matches(&self, words: &Vec<String>, filter_index: u32) -> u32 {
-        if self.filters.len() <= filter_index as usize {
+        if self.filters.len() <= filter_index as usize || words.len() == 0 as usize {
             return 0;
         }
         let mut consequent_matches = 0;
@@ -377,6 +380,7 @@ mod tests {
         _add_test_filter(&mut log_filters, _simple_filter_from_string("mmm nnn ooo ppp"));
         _add_test_filter(&mut log_filters, _add_word_alternative(
             _simple_filter_from_string("qqq rrr sss ttt"), 3, "aaa"));
+        _add_test_filter(&mut log_filters, _simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv"));
         return log_filters;
     }
 
@@ -391,18 +395,114 @@ mod tests {
     }
 
     #[test]
+    fn _find_best_matching_filter_index() {
+        let log_filters = LogFilters::new();
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
+
+        let mut log_filters = _init_test_data();
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
+        // Empty words vector should result in invalid index
+        let words = vec![];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
+        // First full match should be returned
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        // If words vector is shorter than filter then first fully matching filter should be returned
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        let words = vec!["aaa".to_string(), "bbb".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        let words = vec!["aaa".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        // Test if 1 word alternative is allowed
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "xxx".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        let words = vec!["aaa".to_string(), "xxx".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        // Two and more new alternatives should result in incorrect index
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "zzz".to_string(), "xxx".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
+        let words = vec!["aaa".to_string(), "xxx".to_string(), "zzz".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
+        // Test if words vector can be longer than existing filter
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string(),
+            "eee".to_string(), "fff".to_string(), "ggg".to_string(), "hhh".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        // Test if longer words vector will be allowed to contain 1 word alternative to existing word
+        let words = vec!["aaa".to_string(), "xxx".to_string(), "ccc".to_string(), "ddd".to_string(),
+            "eee".to_string(), "fff".to_string(), "ggg".to_string(), "hhh".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        // Test if longer words vector will be allowed to contain 1 new word alternative
+        let words = vec!["aaa".to_string(), "xxx".to_string(), "bbb".to_string(), "ccc".to_string(),
+            "ddd".to_string(), "fff".to_string(), "ggg".to_string(), "hhh".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        // Test if words vector and filter vector must contain words in the same order
+        let words = vec!["ddd".to_string(), "ccc".to_string(), "bbb".to_string(), "aaa".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
+        let words = vec!["ccc".to_string(), "bbb".to_string(), "aaa".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
+        let words = vec!["bbb".to_string(), "aaa".to_string()];
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
+    }
+
+    #[test]
+    fn _get_filter_indexes_with_min_req_matches() {
+        // Test what happens if method was used on empty data structure
+        let log_filters = LogFilters::new();
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&vec![]), vec![]);
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![]);
+
+        let mut log_filters = _init_test_data();
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
+        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&vec![]), vec![]);
+        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0, 5]);
+        // Test when words length is less than self.min_req_consequent_matches
+        let words = vec!["aaa".to_string(), "bbb".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0, 4, 5]);
+        let words = vec!["aaa".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0, 4, 5]);
+        // But empty words vector is still not allowed
+        let words = vec![];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![]);
+        // One-word words vector will only match if at least one filter contains that word
+        let words = vec!["xyz".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![]);
+        // Test when new word alternatives are required
+        let words = vec!["aaa".to_string(), "lll".to_string(), "ccc".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0, 5]);
+        // Test when new word alternative is required and words vector is shorter than filter
+        let words = vec!["aaa".to_string(), "lll".to_string(), "ccc".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0, 5]);
+        // We are not counting consequent matches here, max_allowed_new_alternatives
+        let words = vec!["aaa".to_string(), "lll".to_string(), "zzz".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0, 5]);
+        let words = vec!["aaa".to_string(), "lll".to_string(), "zzz".to_string(), "yyy".to_string(), "ddd".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0, 5]);
+        // We are not checking for correct words order here
+        let words = vec!["ddd".to_string(), "lll".to_string(), "zzz".to_string(), "yyy".to_string(), "aaa".to_string()];
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0, 5]);
+    }
+
+    #[test]
     fn _get_sorted_filter_indexes_containing_words() {
         let log_filters = LogFilters::new();
         let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
         assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![]);
         assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&vec![]), vec![]);
 
-        let log_filters = _init_test_data();
+        let mut log_filters = _init_test_data();
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
         assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&vec![]), vec![]);
         let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
-        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![0, 4]);
+        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![0, 0, 0, 0, 4, 5, 5, 5, 5]);
         let words = vec!["aaa".to_string(), "xxx".to_string()];
-        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![0, 4]);
+        assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![0, 4, 5]);
         let words = vec!["xxx".to_string()];
         assert_eq!(log_filters._get_sorted_filter_indexes_containing_words(&words), vec![]);
     }
@@ -422,12 +522,13 @@ mod tests {
 
         let mut log_filters = _init_test_data();
         log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
         // Test for existing pattern
         let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
         assert_eq!(log_filters._count_consequent_matches(&words, 0), 4);
         assert_eq!(log_filters._count_consequent_matches(&words, 1), 0);
         // Test out of bounds
-        assert_eq!(log_filters._count_consequent_matches(&words, 5), 0);
+        assert_eq!(log_filters._count_consequent_matches(&words, log_filters.filters.len() as u32), 0);
         // Test empty words vector
         assert_eq!(log_filters._count_consequent_matches(&vec![], 0), 0);
         // Test if words vector can be smaller than filter
@@ -494,7 +595,7 @@ mod tests {
         assert_eq!(log_filters._get_word_index_in_filter(&"".to_string(), 4, 0), -1);
         // Test when word does not exist in filter or filter does not exist
         assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 1, 0), -1);
-        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 100, 0), -1);
+        assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), log_filters.filters.len() as u32, 0), -1);
     }
 
     #[test]
@@ -505,7 +606,7 @@ mod tests {
         assert_eq!(log_filters._is_word_in_filter(&"hhh".to_string(), 1), true);
         assert_eq!(log_filters._is_word_in_filter(&"aaa".to_string(), 1), false);
         assert_eq!(log_filters._is_word_in_filter(&"xxx".to_string(), 2), false);
-        assert_eq!(log_filters._is_word_in_filter(&"xxx".to_string(), 100), false);
+        assert_eq!(log_filters._is_word_in_filter(&"xxx".to_string(), log_filters.filters.len() as u32), false);
         assert_eq!(log_filters._is_word_in_filter(&"".to_string(), 0), false);
     }
 }
