@@ -271,7 +271,7 @@ impl LogFilters {
 
     fn _add_filter(&mut self, words: Vec<String>) {
         let mut new_filter = Vec::new();
-        let expected_index = self.filters.len() as u32 - 1;
+        let expected_index = self.filters.len() as u32;
 
         for word in words {
             if word.len() > 0 {
@@ -600,6 +600,23 @@ mod tests {
         // Test when word does not exist in filter or filter does not exist
         assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), 1, 0), -1);
         assert_eq!(log_filters._get_word_index_in_filter(&"aaa".to_string(), log_filters.filters.len() as u32, 0), -1);
+    }
+
+    #[test]
+    fn _add_filter() {
+        // Test what happens if method was used on empty data structure
+        let mut log_filters = LogFilters::new();
+        log_filters._add_filter(vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string()]);
+        assert_eq!(log_filters.words_hash.get(&"aaa".to_string()).unwrap(), &vec![0]);
+        assert_eq!(log_filters.words_hash.get(&"bbb".to_string()).unwrap(), &vec![0]);
+        assert_eq!(log_filters.words_hash.get(&"ccc".to_string()).unwrap(), &vec![0]);
+        assert_eq!(log_filters.filters.get(0).unwrap(), &vec![vec!["aaa"], vec!["bbb"], vec!["ccc"]]);
+        // _add_filter does not check if filter already exists
+        log_filters._add_filter(vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string()]);
+        assert_eq!(log_filters.words_hash.get(&"aaa".to_string()).unwrap(), &vec![0, 1]);
+        assert_eq!(log_filters.words_hash.get(&"bbb".to_string()).unwrap(), &vec![0, 1]);
+        assert_eq!(log_filters.words_hash.get(&"ccc".to_string()).unwrap(), &vec![0, 1]);
+        assert_eq!(log_filters.filters.get(1).unwrap(), &vec![vec!["aaa"], vec!["bbb"], vec!["ccc"]]);
     }
 
     #[test]
