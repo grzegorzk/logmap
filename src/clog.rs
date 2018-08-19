@@ -680,6 +680,9 @@ mod tests {
         // first word matching last filter alternative with earlier match available
         let words = vec!["sss".to_string(), "aaa".to_string(), "ccc".to_string(), "ddd".to_string()];
         assert_eq!(log_filters._get_indexes_of_first_matching_word(&words, 0), (1, 0));
+        // no matches
+        let words = vec!["xyz".to_string()];
+        assert_eq!(log_filters._get_indexes_of_first_matching_word(&words, 0), (-1, -1));
     }
 
     #[test]
