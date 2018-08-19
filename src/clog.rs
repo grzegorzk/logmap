@@ -211,12 +211,16 @@ impl LogFilters {
         if word.len() == 0 {
             return -1;
         }
-
+        if self.words_hash.get(word).is_none() {
+            return -1;
+        }
+        if !self.words_hash.get(word).unwrap().contains(&filter_index) {
+            return -1;
+        }
         let filter = self.filters.get(filter_index);
         if filter.is_none() {
             return -1;
         }
-
         let filter = filter.unwrap();
         if filter.len() == 0 || filter.len() - 1 < start_from_word {
             return -1;
@@ -248,7 +252,7 @@ impl LogFilters {
     }
 
     fn _normalise_till_first_match(&mut self, words: &Vec<String>, filter_index: usize) {
-        let (first_word, first_filter) = self._get_first_matching_indexes(&words, filter_index);
+        let (first_word, first_filter) = self._get_indexes_of_first_matching_word(&words, filter_index);
         if first_word >= 0 && first_filter >= 0 {
             if first_word - first_filter > 0 {
                 let mut front_words = Vec::new();
@@ -267,8 +271,11 @@ impl LogFilters {
         }
     }
 
-    fn _get_first_matching_indexes(&self, words: &Vec<String>, filter_index: usize) -> (isize, isize) {
+    fn _get_indexes_of_first_matching_word(&self, words: &Vec<String>, filter_index: usize) -> (isize, isize) {
         if words.len() == 0 || self.filters.get(filter_index).is_none() {
+            return (-1, -1);
+        }
+        if self.filters.get(filter_index).unwrap().len() == 0 {
             return (-1, -1);
         }
 
