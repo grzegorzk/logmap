@@ -259,7 +259,7 @@ impl LogFilters {
         let mut unmatched_word_index = start_word;
         let mut options_lag : usize = start_filter - start_word;
         for alternatives_index in start_filter..original_filter_length {
-            if alternatives_index > words.len() - 1 {
+            if alternatives_index - options_lag > words.len() - 1 {
                 break;
             }
             if alternatives_index - options_lag > unmatched_word_index {
@@ -299,11 +299,11 @@ impl LogFilters {
                             }
                         }
                     }
-                    // filter had more columns than word vector
+                    // filter had more columns than word vector (turn them into optional alternatives)
                     if last_optional >= 0 {
                         let mut filter = self.filters.get_mut(filter_index).unwrap();
                         let last_optional = last_optional as usize;
-                        for index in unmatched_word_index + options_lag..last_optional {
+                        for index in unmatched_word_index + options_lag..alternatives_index {
                             if !filter.get(index).unwrap().contains(&self.denote_optional) {
                                 filter.get_mut(index).unwrap().push(self.denote_optional.clone());
                                 updated_words += 1;
@@ -370,7 +370,8 @@ impl LogFilters {
                 }
                 word_index += 1;
             }
-            return (first_word, first_filter - first_word);
+            let word_index = word_index as isize;
+            return (first_word, first_filter - first_word + word_index);
         }
     }
 
@@ -818,7 +819,7 @@ mod tests {
         assert_eq!(log_filters.filters.get(2).unwrap(), &expected);
         // One word turned to optional alternative and one new alternative added
         let words = _words_vector_from_string("bar ccc sss");
-        assert_eq!(log_filters._update_filter(words, 0), 1);
+        assert_eq!(log_filters._update_filter(words, 0), 2);
         let mut expected = _simple_filter_from_string("aaa qqq ccc sss");
         expected = _add_word_alternative(expected, 0, ".");
         expected = _add_word_alternative(expected, 1, "bbb");
@@ -857,11 +858,23 @@ mod tests {
         assert_eq!(log_filters.words_hash.get(&"bar".to_string()).unwrap(), &vec![1]);
         assert_eq!(log_filters.words_hash.get(&"baz".to_string()).unwrap(), &vec![1]);
 
-        //TODO: below test is failing
         let mut log_filters = _init_test_data();
         log_filters.max_allowed_new_alternatives = 1;
         log_filters.min_req_consequent_matches = 3;
         log_filters.denote_optional = ".".to_string();
+        // Turn one word in the middle to optional alternative
+        let words = _words_vector_from_string("ttt aaa bbb ccc ddd vvv");
+        assert_eq!(log_filters._update_filter(words, 5), 1);
+        let mut expected = _simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv");
+        expected = _add_word_alternative(expected, 2, ".");
+        assert_eq!(log_filters.filters.get(5).unwrap(), &expected);
+        // Turn two non-consequent words in the middle to optional alternatives
+        let words = _words_vector_from_string("eee ggg x y z");
+        assert_eq!(log_filters._update_filter(words, 1), 2);
+        let mut expected = _simple_filter_from_string("eee fff ggg hhh x y z");
+        expected = _add_word_alternative(expected, 1, ".");
+        expected = _add_word_alternative(expected, 3, ".");
+        assert_eq!(log_filters.filters.get(1).unwrap(), &expected);
         // Turn one word in the middle to optional alternative
         let words = _words_vector_from_string("iii jjj lll");
         assert_eq!(log_filters._update_filter(words, 2), 1);
@@ -932,7 +945,7 @@ mod tests {
         assert_eq!(log_filters.filters.get(2).unwrap(), &expected);
         // One word turned to optional alternative and one new alternative added to second word
         let words = _words_vector_from_string("bar ccc sss");
-        assert_eq!(log_filters._normalise_lengths_before_first_match(&words, 0), (1, 1));
+        assert_eq!(log_filters._normalise_lengths_before_first_match(&words, 0), (1, 2));
         let mut expected = _simple_filter_from_string("aaa qqq ccc sss");
         expected = _add_word_alternative(expected, 0, ".");
         expected = _add_word_alternative(expected, 1, "bbb");
