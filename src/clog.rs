@@ -333,7 +333,7 @@ impl LogFilters {
 
     fn _normalise_lengths_before_first_match(&mut self, words: &Vec<String>, filter_index: usize) -> (isize, isize) {
         // returns first index after normalised filter slice
-        let (first_word, first_filter) = self._get_indexes_of_earliest_matching_word(&words, filter_index, 0);
+        let (first_word, first_filter) = self._get_indexes_of_earliest_matching_word(&words, filter_index, 0, 0);
         if first_word < 0 || first_filter < 0 {
             return (-1, -1);
         }
@@ -375,19 +375,20 @@ impl LogFilters {
         }
     }
 
-    fn _get_indexes_of_earliest_matching_word(&self, words: &Vec<String>, filter_index: usize, word_start_index: usize) -> (isize, isize) {
+    fn _get_indexes_of_earliest_matching_word(&self, words: &Vec<String>, filter_index: usize, word_start_index: usize, filter_start_index: usize) -> (isize, isize) {
         if words.len() as isize - 1 < word_start_index as isize || self.filters.get(filter_index).is_none() {
             return (-1, -1);
         }
-        if self.filters.get(filter_index).unwrap().len() as isize - 1 < word_start_index as isize {
+        if self.filters.get(filter_index).unwrap().len() as isize - 1 < filter_start_index as isize {
             return (-1, -1);
         }
 
+        let filters_offset = filter_start_index as isize - word_start_index as isize;
         let mut first_matching_word : isize = -1;
         let mut first_matching_filter : isize = -1;
         for word_index in word_start_index..words.len() {
             let word = words.get(word_index).unwrap();
-            let matching_filter_index = self._get_word_index_in_filter(word, filter_index, word_start_index);
+            let matching_filter_index = self._get_word_index_in_filter(word, filter_index, (word_start_index as isize + filters_offset) as usize);
             if  matching_filter_index >= 0 {
                 if first_matching_filter == -1 {
                     first_matching_filter = matching_filter_index;
@@ -959,66 +960,115 @@ mod tests {
     fn _get_indexes_of_earliest_matching_word() {
         let mut log_filters = LogFilters::new();
         // Test empty words vector on empty filters
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&vec![], 0, 0), (-1, -1));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&vec![], 0, 0, 0), (-1, -1));
         // Test valid words vector on empty filters
         let words = _words_vector_from_string("aaa bbb ccc ddd");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0), (-1, -1));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0, 0), (-1, -1));
         // Test valid words vector on empty filter
         log_filters.filters.push(vec![]);
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0), (-1, -1));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0, 0), (-1, -1));
 
         // Tests covering when both filter and words vector start from column 0
         let mut log_filters = _init_test_data();
         log_filters.max_allowed_new_alternatives = 1;
         log_filters.min_req_consequent_matches = 3;
         // Test empty words vector on valid filters
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&vec![], 0, 0), (-1, -1));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&vec![], 0, 0, 0), (-1, -1));
         // both filter and words vector match first word
         let words = _words_vector_from_string("aaa bbb ccc ddd");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0), (0, 0));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0, 0), (0, 0));
         // first filter's alternative matches second word
         let words = _words_vector_from_string("xyz aaa ccc ddd");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0), (1, 0));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0, 0), (1, 0));
         // second filter's alternative matches second word
         let words = _words_vector_from_string("xyz bbb ccc ddd");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0), (1, 1));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0, 0), (1, 1));
         // first word matching last filter alternative with earlier match available
         let words = _words_vector_from_string("sss aaa ccc ddd");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0), (1, 0));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0, 0), (1, 0));
         // words missing first alternative and second alternative with new option
         let words = _words_vector_from_string("bar ccc sss");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0), (1, 2));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0, 0), (1, 2));
         // no matches
         let words = _words_vector_from_string("xyz");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0), (-1, -1));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 0, 0), (-1, -1));
 
-        // Tests covering when both filter and words vector do not start from column 0
+        // Tests covering when both filter and words vector do not start from column 0 but both are the same indexes
         let mut log_filters = _init_test_data();
         log_filters.max_allowed_new_alternatives = 1;
         log_filters.min_req_consequent_matches = 3;
         // Test empty words vector on valid filters
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&vec![], 0, 2), (-1, -1));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&vec![], 0, 2, 2), (-1, -1));
         // both filter and words vector match first word
         let words = _words_vector_from_string("aaa bbb ccc ddd");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 2), (2, 2));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 2, 2), (2, 2));
         // first filter's alternative matches second word
         let words = _words_vector_from_string("aaa bbb xyz ccc");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 2), (3, 2));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 2, 2), (3, 2));
         // second filter's alternative matches second word
         let words = _words_vector_from_string("aaa bbb xyz ddd");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 2), (3, 3));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 2, 2), (3, 3));
         // words missing first alternative and second alternative with new option
         let words = _words_vector_from_string("aaa bar ddd");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 1), (2, 3));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 1, 1), (2, 3));
         // no matches
         let words = _words_vector_from_string("xyz foo bar baz");
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 2), (-1, -1));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 0, 2, 2), (-1, -1));
         // first word matching last filter alternative with earlier match available
         let words = _words_vector_from_string("aaa bbb lll ddd eee fff ggg hhh");
         let new_filter = _simple_filter_from_string("aaa bbb ccc ddd eee fff ggg hhh");
         let new_filter = _add_word_alternative(new_filter, 7, "lll");
         _add_test_filter(&mut log_filters, new_filter);
-        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 6, 2), (3, 3));
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 6, 2, 2), (3, 3));
+
+        // Tests covering when both filter and words vector do not start from column 0 and both are different indexes
+        let mut log_filters = _init_test_data();
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
+        // Test empty words vector on valid filters
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&vec![], 5, 3, 2), (-1, -1));
+        // both filter and words vector match first word
+        //     0   1   2  |  3   4   5   6
+        // w: ttt aaa kkk | uuu ccc ddd vvv
+        // f:     ttt aaa | uuu bbb ccc ddd vvv
+        //         0   1  |  2   3   4   5   6
+        let words = _words_vector_from_string("ttt aaa kkk uuu ccc ddd vvv");
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 5, 3, 2), (3, 2));
+        // first filter's alternative matches second word
+        //     0   1   2  |  3   4   5   6   7   8
+        // w: ttt aaa uuu | xyz uuu bbb ccc ddd vvv
+        // f:     ttt aaa | uuu bbb ccc ddd vvv
+        //         0   1  |  2   3   4   5   6
+        let words = _words_vector_from_string("ttt aaa uuu xyz uuu bbb ccc ddd vvv");
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 5, 3, 2), (4, 2));
+        // second filter's alternative matches second word
+        //     0   1   2  |  3   4   5   6   7
+        // w: ttt aaa uuu | fff bbb ccc ddd vvv
+        // f:     ttt aaa | uuu bbb ccc ddd vvv
+        //         0   1  |  2   3   4   5   6
+        let words = _words_vector_from_string("ttt aaa uuu fff bbb ccc ddd vvv");
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 5, 3, 2), (4, 3));
+        // words missing first alternative and second alternative with new option
+        //     0   1   2  |  3   4   5   6
+        // w: ttt aaa fff | xyz ccc ddd vvv
+        // f:     ttt aaa | uuu bbb ccc ddd vvv
+        //         0   1  |  2   3   4   5   6
+        let words = _words_vector_from_string("ttt aaa fff xyz ccc ddd vvv");
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 5, 3, 2), (4, 4));
+        // no matches
+        let words = _words_vector_from_string("xyz foo bar baz");
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 5, 3, 2), (-1, -1));
+        // first word matching last filter alternative with earlier match available
+        //     0   1   2  |  3   4   5   6   7   8
+        // w: aaa bbb ccc | lll ddd eee fff ggg hhh
+        // f:     aaa bbb | ccc ddd eee fff ggg hhh
+        //                                      lll
+        //         0   1  |  2   3   4   5   6   7
+        let words = _words_vector_from_string("aaa bbb ccc lll ddd eee fff ggg hhh");
+        let new_filter = _simple_filter_from_string("aaa bbb ccc ddd eee fff ggg hhh");
+        let new_filter = _add_word_alternative(new_filter, 7, "lll");
+        _add_test_filter(&mut log_filters, new_filter);
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 6, 3, 2), (4, 3));
     }
 
     #[test]
