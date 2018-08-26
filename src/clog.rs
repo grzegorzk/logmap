@@ -250,13 +250,26 @@ impl LogFilters {
         let mut indexes = self._normalise_lengths_before_first_match(&words, filter_index, 0, 0);
         while indexes.0 >= 0 && indexes.1 >= 0 && words.len() - 1 >= indexes.0 as usize {
             let new_indexes = self._normalise_lengths_before_first_match(&words, filter_index, indexes.0 as usize, indexes.1 as usize);
+            if new_indexes.0 == -1 || new_indexes.1 == -1 {
+                break;
+            }
             if new_indexes.0 != indexes.0 || new_indexes.1 != indexes.1 {
                 indexes = new_indexes;
             }
             else {
+                if indexes.0 == words.len() as isize - 1 {
+                    break;
+                }
                 indexes.0 += 1;
                 indexes.1 += 1;
             }
+        }
+        if indexes.0 >= 0 && indexes.1 >= 0 && indexes.0 <= words.len() as isize - 1 {
+            let mut reversed_words = words.clone();
+            reversed_words.reverse();
+            self.filters.get_mut(filter_index).unwrap().reverse();
+            self._normalise_lengths_before_first_match(&reversed_words, filter_index, 0, 0);
+            self.filters.get_mut(filter_index).unwrap().reverse();
         }
     }
 
@@ -851,7 +864,6 @@ mod tests {
         let words = _words_vector_from_string("ttt aaa uuu bbb ccc ddd vvv xyz");
         log_filters._update_filter(words, 5);
         let mut expected = _simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv xyz");
-        expected = _add_word_alternative(expected, 7, "xyz");
         expected = _add_word_alternative(expected, 7, ".");
         assert_eq!(log_filters.filters.get(5).unwrap(), &expected);
         assert_eq!(log_filters.words_hash.get(&"xyz".to_string()).unwrap(), &vec![5]);
