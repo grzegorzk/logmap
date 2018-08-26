@@ -19,7 +19,7 @@ pub struct LogFilters {
     /// Minimum required consequent matches to consider lines similar
     min_req_consequent_matches: usize,
     /// Maximum allowed new alternatives
-    max_allowed_new_alternatives: usize,
+    pub max_allowed_new_alternatives: usize,
     /// If `denote_optional` is found within alternatives then column is treated as optional
     denote_optional: String,
 }
@@ -819,6 +819,42 @@ mod tests {
         let mut expected = _simple_filter_from_string("iii jjj kkk lll");
         expected = _add_word_alternative(expected, 2, ".");
         assert_eq!(log_filters.filters.get(2).unwrap(), &expected);
+
+        let mut log_filters = _init_test_data();
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
+        log_filters.denote_optional = ".".to_string();
+        // Last word not matching
+        let words = _words_vector_from_string("ttt aaa uuu bbb ccc ddd xyz");
+        log_filters._update_filter(words, 5);
+        let mut expected = _simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv");
+        expected = _add_word_alternative(expected, 6, "xyz");
+        assert_eq!(log_filters.filters.get(5).unwrap(), &expected);
+        assert_eq!(log_filters.words_hash.get(&"xyz".to_string()).unwrap(), &vec![5]);
+
+        let mut log_filters = _init_test_data();
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
+        log_filters.denote_optional = ".".to_string();
+        // Words vector shorter by one word
+        let words = _words_vector_from_string("ttt aaa uuu bbb ccc ddd");
+        log_filters._update_filter(words, 5);
+        let mut expected = _simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv");
+        expected = _add_word_alternative(expected, 6, ".");
+        assert_eq!(log_filters.filters.get(5).unwrap(), &expected);
+
+        let mut log_filters = _init_test_data();
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
+        log_filters.denote_optional = ".".to_string();
+        // Words vector longer by one word
+        let words = _words_vector_from_string("ttt aaa uuu bbb ccc ddd vvv xyz");
+        log_filters._update_filter(words, 5);
+        let mut expected = _simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv xyz");
+        expected = _add_word_alternative(expected, 7, "xyz");
+        expected = _add_word_alternative(expected, 7, ".");
+        assert_eq!(log_filters.filters.get(5).unwrap(), &expected);
+        assert_eq!(log_filters.words_hash.get(&"xyz".to_string()).unwrap(), &vec![5]);
     }
 
     #[test]
@@ -991,7 +1027,7 @@ mod tests {
         // f:     aaa bbb | ccc ddd eee fff ggg hhh
         //                                      lll
         //         0   1  |  2   3   4   5   6   7
-        // f:     aaa bbb | ccc ddd eee fff ggg hhh
+        // r:     aaa bbb | ccc ddd eee fff ggg hhh
         //                  lll                 lll
         let words = _words_vector_from_string("aaa bbb ccc lll ddd eee fff ggg hhh");
         let new_filter = _simple_filter_from_string("aaa bbb ccc ddd eee fff ggg hhh");
@@ -1117,6 +1153,13 @@ mod tests {
         let new_filter = _add_word_alternative(new_filter, 7, "lll");
         _add_test_filter(&mut log_filters, new_filter);
         assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 6, 3, 2), (4, 3));
+        // same filter, matching last word
+        //     0   1   2   3   4   5   6   7  |  8
+        // w: aaa bbb ccc lll ddd eee fff ggg | hhh
+        // f:     aaa bbb ccc ddd eee fff ggg | hhh
+        //                                    | lll
+        //         0   1   2   3   4   5   6     7
+        assert_eq!(log_filters._get_indexes_of_earliest_matching_word(&words, 6, 8, 7), (8, 7));
     }
 
     #[test]
