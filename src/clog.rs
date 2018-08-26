@@ -81,6 +81,7 @@ impl LogFilters {
             c == '.' ||
             c == ':' ||
             c == '"' ||
+            c == '\'' ||
             c == '(' ||
             c == ')' ||
             c == '{' ||
@@ -103,7 +104,8 @@ impl LogFilters {
                 words.push(word);
             }
         }
-        if words.len() > 0 {
+        // TODO: shorter lines should be correctly processed and not result in duplicated filters
+        if words.len() > self.min_req_consequent_matches - self.max_allowed_new_alternatives {
             let matched_filter_index = self._find_best_matching_filter_index(&words);
             if matched_filter_index >= 0 {
                 self._update_filter(words, matched_filter_index as usize);
@@ -426,6 +428,7 @@ mod tests {
             c == '.' ||
             c == ':' ||
             c == '"' ||
+            c == '\'' ||
             c == '(' ||
             c == ')' ||
             c == '{' ||
@@ -449,6 +452,7 @@ mod tests {
             c == '.' ||
             c == ':' ||
             c == '"' ||
+            c == '\'' ||
             c == '(' ||
             c == ')' ||
             c == '{' ||
