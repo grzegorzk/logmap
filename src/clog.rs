@@ -89,7 +89,7 @@ impl LogFilters {
             c == ']');
         let mut words = Vec::new();
 
-        let mut i = 1;
+        let mut i = 0;
         for word in words_iterator {
             let word = word.to_string();
             if word.len() > 0 {
@@ -103,13 +103,14 @@ impl LogFilters {
                 words.push(word);
             }
         }
-
-        let matched_filter_index = self._find_best_matching_filter_index(&words);
-        if matched_filter_index >= 0 {
-            self._update_filter(words, matched_filter_index as usize);
-        }
-        else {
-            self._add_filter(words);
+        if words.len() > 0 {
+            let matched_filter_index = self._find_best_matching_filter_index(&words);
+            if matched_filter_index >= 0 {
+                self._update_filter(words, matched_filter_index as usize);
+            }
+            else {
+                self._add_filter(words);
+            }
         }
     }
 
