@@ -18,10 +18,14 @@ pub struct LogFilters {
     words_hash: HashMap<String, Vec<usize>>,
     /// Minimum required consequent matches to consider lines similar
     min_req_consequent_matches: usize,
-    /// Maximum allowed new alternatives
+    /// Maximum allowed new alternatives when analysing any new line
     pub max_allowed_new_alternatives: usize,
     /// If `denote_optional` is found within alternatives then column is treated as optional
     denote_optional: String,
+    /// Should words that contain only numbers be ignored
+    ignore_numeric_words: bool,
+    /// Drop first columns before analysing
+    ignore_first_columns: usize,
 }
 
 impl LogFilters {
@@ -35,7 +39,9 @@ impl LogFilters {
             min_req_consequent_matches: 3,
             max_allowed_new_alternatives: 1,
             // below must never land as word alternative
-            denote_optional: ".".to_string()
+            denote_optional: ".".to_string(),
+            ignore_numeric_words: true,
+            ignore_first_columns: 2
         }
     }
 
@@ -83,9 +89,17 @@ impl LogFilters {
             c == ']');
         let mut words = Vec::new();
 
+        let mut i = 1;
         for word in words_iterator {
             let word = word.to_string();
-            if word.len() > 0 && !self._is_word_only_numeric(&word) {
+            if word.len() > 0 {
+                if self.ignore_numeric_words && self._is_word_only_numeric(&word) {
+                    continue;
+                }
+                if i < self.ignore_first_columns {
+                    i += 1;
+                    continue;
+                }
                 words.push(word);
             }
         }
