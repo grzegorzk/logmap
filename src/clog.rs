@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+use std::error::Error;
+use std::io::prelude::*;
+use std::fs::File;
+use std::path::Path;
 use std::collections::HashMap;
 
 pub struct LogFilters {
@@ -45,8 +49,31 @@ impl LogFilters {
         }
     }
 
-    pub fn save_filters(&self) {
-        // TODO
+    pub fn save(&self, path: &Path) {
+        let mut log_filters_str = String::new();
+        log_filters_str += &self.min_req_consequent_matches.to_string();
+        log_filters_str += "\n";
+        log_filters_str += &self.max_allowed_new_alternatives.to_string();
+        log_filters_str += "\n";
+        log_filters_str += &self.denote_optional;
+        log_filters_str += "\n";
+        log_filters_str += &self.ignore_numeric_words.to_string();
+        log_filters_str += "\n";
+        log_filters_str += &self.ignore_first_columns.to_string();
+        log_filters_str += "\n";
+        log_filters_str += &self._filters_to_string();
+
+        let path_display = path.display();
+        let mut file = match File::create(&path) {
+            Err(why) => panic!("Couldn't create {}: {}", path_display, why.description()),
+            Ok(file) => file,
+        };
+        match file.write_all(log_filters_str.as_bytes()) {
+            Err(why) => {
+                panic!("couldn't write to {}: {}", path_display, why.description())
+            },
+            Ok(_) => println!("successfully wrote to {}", path_display),
+        }
     }
 
     fn _filters_to_string(&self) -> String {
@@ -72,7 +99,7 @@ impl LogFilters {
 
     pub fn print(&self) {
         if self.filters.len() > 0 {
-            for elem in self.filters {
+            for elem in &self.filters {
                 println!("{:?}", elem);
             }
         }
@@ -81,7 +108,7 @@ impl LogFilters {
         }
         println!();
         if self.words_hash.len() > 0 {
-            for (key, value) in self.words_hash {
+            for (key, value) in &self.words_hash {
                 println!("{} : {:?}", key, value);
             }
         }
