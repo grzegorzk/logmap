@@ -45,15 +45,32 @@ impl LogFilters {
         }
     }
 
-    pub fn save_filters(self) {
+    pub fn save_filters(&self) {
         // TODO
     }
 
-    pub fn load_filters(self) {
+    fn _filters_to_string(&self) -> String {
+        let mut filters_string : String = self.filters.len().to_string();
+        for filter in &self.filters {
+            filters_string += "\n";
+            filters_string += &filter.len().to_string();
+            for word_alternatives in filter {
+                filters_string += "\n";
+                filters_string += &word_alternatives.len().to_string();
+                for word in word_alternatives {
+                    filters_string += "\n";
+                    filters_string += &word;
+                }
+            }
+        }
+        return filters_string;
+    }
+
+    pub fn load_filters(&self) {
         // TODO
     }
 
-    pub fn print(self) {
+    pub fn print(&self) {
         if self.filters.len() > 0 {
             for elem in self.filters {
                 println!("{:?}", elem);
@@ -514,6 +531,56 @@ mod tests {
     }
 
     #[test]
+    fn _filters_to_string() {
+        let mut log_filters = LogFilters::new();
+        assert_eq!(log_filters._filters_to_string(), "0");
+
+        _add_test_filter(&mut log_filters, _simple_filter_from_string("aaa bbb ccc ddd"));
+        let filter_1 : String = "4
+                                1
+                                aaa
+                                1
+                                bbb
+                                1
+                                ccc
+                                1
+                                ddd".to_string().replace(" ", "");
+        let result = "1\n".to_string() + &filter_1;
+        assert_eq!(log_filters._filters_to_string(), result);
+
+        _add_test_filter(&mut log_filters, _simple_filter_from_string("xxx yyy zzz"));
+        let filter_2 : String = "3
+                                1
+                                xxx
+                                1
+                                yyy
+                                1
+                                zzz".to_string().replace(" ", "");
+        let result = "2\n".to_string() + &filter_1 + "\n" + &filter_2;
+        assert_eq!(log_filters._filters_to_string(), result);
+
+        let mut complex_filter = _simple_filter_from_string("eee fff ggg hhh");
+        complex_filter = _add_word_alternative(complex_filter, 1, "iii");
+        complex_filter = _add_word_alternative(complex_filter, 1, "jjj");
+        complex_filter = _add_word_alternative(complex_filter, 3, ".");
+        _add_test_filter(&mut log_filters, complex_filter);
+        let filter_3 : String = "4
+                                1
+                                eee
+                                3
+                                fff
+                                iii
+                                jjj
+                                1
+                                ggg
+                                2
+                                hhh
+                                .".to_string().replace(" ", "");
+        let result = "3\n".to_string() + &filter_1 + "\n" + &filter_2 + "\n" + &filter_3;
+        assert_eq!(log_filters._filters_to_string(), result);
+    }
+
+    #[test]
     fn _is_word_only_numeric() {
         let log_filters = LogFilters::new();
         assert_eq!(log_filters._is_word_only_numeric(&"asdf".to_string()), false);
@@ -526,7 +593,7 @@ mod tests {
     #[test]
     fn _find_best_matching_filter_index() {
         let log_filters = LogFilters::new();
-        let words = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string(), "ddd".to_string()];
+        let words = _words_vector_from_string("aaa bbb ccc ddd");
         assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
 
         let mut log_filters = _init_test_data();
