@@ -70,9 +70,9 @@ impl LogFilters {
         };
         match file.write_all(log_filters_str.as_bytes()) {
             Err(why) => {
-                panic!("couldn't write to {}: {}", path_display, why.description())
+                panic!("Couldn't write to {}: {}", path_display, why.description())
             },
-            Ok(_) => println!("successfully wrote to {}", path_display),
+            Ok(_) => println!("Successfully wrote to {}", path_display),
         }
     }
 
@@ -93,8 +93,104 @@ impl LogFilters {
         return filters_string;
     }
 
-    pub fn load_filters(&self) {
-        // TODO
+    pub fn load(path: &Path) -> Self {
+        let path_display = path.display();
+        let mut file = match File::open(&path) {
+            Err(why) => panic!("Couldn't open {}: {}", path_display, why.description()),
+            Ok(file) => file,
+        };
+        let mut log_filters_str = String::new();
+        file.read_to_string(&mut log_filters_str).expect("Could not read from file!");
+        let log_filters_lines: Vec<&str> = log_filters_str.split('\n').collect();
+
+        let mut log_filters = LogFilters::_load_parameters(&log_filters_lines);
+        log_filters._filters_from_lines(&log_filters_lines);
+
+        return log_filters;
+    }
+
+    fn _load_parameters(log_filters_lines: &Vec<&str>) -> Self {
+        if log_filters_lines.len() < 6 {
+            panic!("File is corrupted! At least 6 lines expected, found {}", log_filters_lines.len())
+        }
+
+        let min_req_consequent_matches: usize = match log_filters_lines[0].to_string().parse::<usize>() {
+            Err(why) => panic!("Couldn't parse 1st line of input to `usize`: {}, {}", log_filters_lines[0], why.description()),
+            Ok(value) => value,
+        };
+
+        let max_allowed_new_alternatives: usize = match log_filters_lines[1].to_string().parse::<usize>() {
+            Err(why) => panic!("Couldn't parse 2nd line of input to `usize`: {}, {}", log_filters_lines[1], why.description()),
+            Ok(value) => value,
+        };
+
+        let denote_optional: String;
+        denote_optional = log_filters_lines[2].to_string();
+        if denote_optional.len() == 0 {
+            panic!("3rd line of input cannot be empty!");
+        }
+
+        let ignore_numeric_words: bool = match log_filters_lines[3].to_string().parse::<bool>() {
+            Err(why) => panic!("Couldn't parse 4th line of input to `bool`: {}, {}", log_filters_lines[3], why.description()),
+            Ok(value) => value,
+        };
+
+        let ignore_first_columns: usize = match log_filters_lines[4].to_string().parse::<usize>() {
+            Err(why) => panic!("Couldn't parse 5th line of input to `usize`: {}, {}", log_filters_lines[4], why.description()),
+            Ok(value) => value,
+        };
+
+        LogFilters {
+            filters: Vec::new(),
+            words_hash: HashMap::new(),
+            min_req_consequent_matches: min_req_consequent_matches,
+            max_allowed_new_alternatives: max_allowed_new_alternatives,
+            denote_optional: denote_optional,
+            ignore_numeric_words: ignore_numeric_words,
+            ignore_first_columns: ignore_first_columns
+        }
+    }
+
+    fn _filters_from_lines(&mut self, log_filters_lines: &Vec<&str>) {
+        if log_filters_lines.len() < 6 {
+            panic!("File is corrupted! At least 6 lines expected, found {}", log_filters_lines.len())
+        }
+
+        let number_of_filters: usize = match log_filters_lines[5].to_string().parse::<usize>() {
+            Err(why) => panic!("Couldn't parse 6th line of input to `usize`: {}, {}", log_filters_lines[5], why.description()),
+            Ok(value) => value,
+        };
+
+        // TODO: simplify and improve readability
+        let mut processed_lines:usize = 0;
+        for _i in 0..number_of_filters {
+            processed_lines += 1;
+            let number_of_alternatives: usize = match log_filters_lines[5 + processed_lines].to_string().parse::<usize>() {
+                Err(why) => panic!("Couldn't parse {} line of input to `usize`: {}, {}", 5 + processed_lines, log_filters_lines[5 + processed_lines], why.description()),
+                Ok(value) => value,
+            };
+            let mut alternatives = Vec::new();
+            let mut include_in_hash = Vec::new();
+            for _j in 0..number_of_alternatives {
+                processed_lines += 1;
+                let number_of_words: usize = match log_filters_lines[5 + processed_lines].to_string().parse::<usize>() {
+                    Err(why) => panic!("Couldn't parse {} line of input to `usize`: {}, {}", 5 + processed_lines, log_filters_lines[5 + processed_lines], why.description()),
+                    Ok(value) => value,
+                };
+                let mut words = Vec::new();
+                for _k in 0..number_of_words {
+                    processed_lines += 1;
+                    words.push(log_filters_lines[5 + processed_lines].to_string());
+                    include_in_hash.push(log_filters_lines[5 + processed_lines].to_string());
+                }
+                alternatives.push(words);
+            }
+            self.filters.push(alternatives);
+            for word in include_in_hash {
+                let last_filter_index = self.filters.len() - 1;
+                self._update_hash(&word, last_filter_index)
+            }
+        }
     }
 
     pub fn print(&self) {
@@ -606,6 +702,8 @@ mod tests {
         let result = "3\n".to_string() + &filter_1 + "\n" + &filter_2 + "\n" + &filter_3;
         assert_eq!(log_filters._filters_to_string(), result);
     }
+
+    // TODO: cover _load_parameters and _filters_from_lines
 
     #[test]
     fn _is_word_only_numeric() {
