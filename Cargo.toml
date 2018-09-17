@@ -1,6 +1,7 @@
 [package]
 name = "clog"
 version = "0.1.0"
-authors = ["Grzegorz Klimaszewski <grzegorz.klimaszewski@yahoo.com>"]
+authors = ["Grzegorz Klimaszewski <grzegorz(guess)klimaszewski(guess)gmail(guess)com>"]
 
 [dependencies]
+getopts = "0.2"
