@@ -1,6 +1,6 @@
 # clog
 
-Tool helps to spot new behavior in your logs so you don't have to analyse 1000s
+Tool helps to spot new behavior in your logs so you don't have to analyze 1000s
 of lines yourself. Create log filters from known logs. Use filters to flag unknown logs.
 
 # Prerequisites
@@ -24,10 +24,22 @@ If you want to you can also run tests to see if everything works as expected:
 # Usage
 
 Analyse logs and save filters to a file (example with systemd):
-`journalctl --since "10 years ago" -nall | clog -m -s clog.result`
+`journalctl --since "10 years ago" -nall | ./target/release/clog -m -s clog.result`
 
 Filter today's logs to see if there is anything that would require attention:
-`journalctl --since "1 day ago" -nall | clog -l clog.result -p`
+`journalctl --since "1 day ago" -nall | ./target/release/clog -l clog.result -p`
+
+# How it works
+
+`clog` counts matching words across known filters.
+
+If invoked in learning mode it will allow some words not to match and extend
+best-matching filter to contain some word alternatives. If no best-matching filter
+was found it will then add new filter.
+
+If invoked in passive (analysis) mode it will not allow for any non-matching words
+and print to standard error stream all lines with no matching filter.
+Empty output means there are no unseen logs in the input stream.
 
 # Thanks
 Big thank-you to:
