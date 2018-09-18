@@ -187,6 +187,9 @@ impl LogFilters {
             }
             self.filters.push(alternatives);
             for word in include_in_hash {
+                if word == self.denote_optional {
+                    continue;
+                }
                 let last_filter_index = self.filters.len() - 1;
                 self._update_hash(&word, last_filter_index)
             }
@@ -204,12 +207,52 @@ impl LogFilters {
         }
         println!();
         if self.words_hash.len() > 0 {
-            for (key, value) in &self.words_hash {
-                println!("{} : {:?}", key, value);
+            let keys: &Vec<&String> = &self.words_hash.keys().collect();
+            let mut keys = keys.clone();
+            keys.sort();
+            for key in keys {
+                println!("{} : {:?}", key, &self.words_hash[key]);
             }
         }
         else {
             println!("No words with references to filters added yet");
+        }
+    }
+
+    pub fn analyze_line(&self, log_line: &str) {
+        // TODO: extract below iterator to separate method
+        let words_iterator = log_line.split(|c|
+            c == ' ' ||
+            c == '/' ||
+            c == ',' ||
+            c == '.' ||
+            c == ':' ||
+            c == '"' ||
+            c == '\'' ||
+            c == '(' ||
+            c == ')' ||
+            c == '{' ||
+            c == '}' ||
+            c == '[' ||
+            c == ']');
+        let mut words = Vec::new();
+
+        let mut i = 0;
+        for word in words_iterator {
+            let word = word.to_string();
+            if word.len() > 0 {
+                if self.ignore_numeric_words && self._is_word_only_numeric(&word) {
+                    continue;
+                }
+                if i < self.ignore_first_columns {
+                    i += 1;
+                    continue;
+                }
+                words.push(word);
+            }
+        }
+        if self._find_best_matching_filter_index(&words) == -1 {
+            eprintln!("{}", log_line);
         }
     }
 

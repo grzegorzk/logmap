@@ -14,6 +14,8 @@ pub fn main() {
     opts.optopt("l", "load", "Load filters from given path and use to scan logs from input", "PATH");
     opts.optopt("s", "save", "Save filters under given path, does not work when piping", "PATH");
     opts.optflag("m", "map", "Map filters from input (extend already loaded filters if -l was used)");
+    opts.optflag("p", "passive", "Works only in conjunction with `l`. Analyse logs using loaded filters.");
+    opts.optflag("d", "debug", "Print internal data structure");
     opts.optflag("h", "help", "Print this help menu");
 
     let matches = match opts.parse(&args) {
@@ -50,11 +52,20 @@ pub fn main() {
             }
         }
     }
+    if matches.opt_present("d") {
+        log_filters.print();
+    }
+    if matches.opt_present("p") {
+        let std_in = io::stdin();
+        for line in std_in.lock().lines() {
+            let log_line = line.expect("INVALID INPUT!");
+            log_filters.analyze_line(&log_line);
+        }
+    }
     if matches.opt_str("s").is_some() {
         let file_path_str = matches.opt_str("s").unwrap();
         let save_file_path = Path::new(&file_path_str);
         log_filters.save(&save_file_path);
     }
-
     exit(0);
 }
