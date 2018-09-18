@@ -1,6 +1,6 @@
 [package]
 name = "clog"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Grzegorz Klimaszewski <grzegorz(guess)klimaszewski(guess)gmail(guess)com>"]
 
 [dependencies]
