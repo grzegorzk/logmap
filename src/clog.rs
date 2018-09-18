@@ -219,7 +219,7 @@ impl LogFilters {
         }
     }
 
-    pub fn analyze_line(&self, log_line: &str) {
+    pub fn analyze_line(&mut self, log_line: &str) {
         // TODO: extract below iterator to separate method
         let words_iterator = log_line.split(|c|
             c == ' ' ||
@@ -251,6 +251,7 @@ impl LogFilters {
                 words.push(word);
             }
         }
+        self.max_allowed_new_alternatives = 0;
         if self._find_best_matching_filter_index(&words) == -1 {
             eprintln!("{}", log_line);
         }
