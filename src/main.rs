@@ -32,13 +32,13 @@ pub fn main() {
     }
 
     let mut log_filters = clog::LogFilters::new();
-    log_filters.max_allowed_new_alternatives = 2;
     if matches.opt_str("l").is_some() {
         let file_path_str = matches.opt_str("l").unwrap();
         let load_file_path = Path::new(&file_path_str);
         log_filters = clog::LogFilters::load(load_file_path);
     }
     if matches.opt_present("m") {
+        log_filters.max_allowed_new_alternatives = 2;
         let std_in = io::stdin();
         let mut icnt = 0;
         for line in std_in.lock().lines() {
@@ -56,6 +56,7 @@ pub fn main() {
         log_filters.print();
     }
     if matches.opt_present("p") {
+        log_filters.max_allowed_new_alternatives = 0;
         let std_in = io::stdin();
         for line in std_in.lock().lines() {
             let log_line = line.expect("INVALID INPUT!");
