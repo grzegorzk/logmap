@@ -233,9 +233,8 @@ impl LogFilters {
         }
     }
 
-    pub fn analyze_line(&mut self, log_line: &str) {
-        // TODO: extract below iterator to separate method
-        let words_iterator = log_line.split(|c|
+    fn _line_split(log_line: &str) -> Vec<String> {
+        log_line.split(|c|
             c == ' ' ||
             c == '/' ||
             c == ',' ||
@@ -248,11 +247,15 @@ impl LogFilters {
             c == '{' ||
             c == '}' ||
             c == '[' ||
-            c == ']');
+            c == ']').map(|s| s.to_string()).collect()
+    }
+
+    pub fn analyze_line(&mut self, log_line: &str) {
+        let raw_words = LogFilters::_line_split(log_line);
         let mut words = Vec::new();
 
         let mut i = 0;
-        for word in words_iterator {
+        for word in raw_words {
             let word = word.to_string();
             if word.len() > 0 {
                 if self.ignore_numeric_words && self._is_word_only_numeric(&word) {
@@ -272,24 +275,11 @@ impl LogFilters {
     }
 
     pub fn learn_line(&mut self, log_line: &str) {
-        let words_iterator = log_line.split(|c|
-            c == ' ' ||
-            c == '/' ||
-            c == ',' ||
-            c == '.' ||
-            c == ':' ||
-            c == '"' ||
-            c == '\'' ||
-            c == '(' ||
-            c == ')' ||
-            c == '{' ||
-            c == '}' ||
-            c == '[' ||
-            c == ']');
+        let raw_words = LogFilters::_line_split(log_line);
         let mut words = Vec::new();
 
         let mut i = 0;
-        for word in words_iterator {
+        for word in raw_words {
             let word = word.to_string();
             if word.len() > 0 {
                 if self.ignore_numeric_words && self._is_word_only_numeric(&word) {
@@ -327,7 +317,7 @@ impl LogFilters {
         let mut best_matching_filter_index : isize = -1;
         let mut max_consequent_matches : usize = 0;
         for filter_index in self._get_filter_indexes_with_min_req_matches(words) {
-            let max_cur_consequent_matches : usize = self._count_consequent_matches(words, filter_index);
+            let max_cur_consequent_matches = self._count_consequent_matches(words, filter_index);
             if max_cur_consequent_matches > max_consequent_matches {
                 max_consequent_matches = max_cur_consequent_matches;
                 best_matching_filter_index = filter_index as isize;
@@ -618,48 +608,14 @@ mod tests {
     use super::*;
 
     fn _words_vector_from_string(words: &str) -> Vec<String> {
-        // TODO: below must be kept in sync with LogFilters::learn_line
-        let words_iterator = words.split(|c|
-            c == ' ' ||
-            c == '/' ||
-            c == ',' ||
-            c == '.' ||
-            c == ':' ||
-            c == '"' ||
-            c == '\'' ||
-            c == '(' ||
-            c == ')' ||
-            c == '{' ||
-            c == '}' ||
-            c == '[' ||
-            c == ']');
-
-        let mut words_vector = Vec::new();
-        for word in words_iterator {
-            words_vector.push(word.to_string());
-        }
-        return words_vector;
+        LogFilters::_line_split(words)
     }
 
     fn _simple_filter_from_string(words: &str) -> Vec<Vec<String>> {
-        // TODO: below must be kept in sync with LogFilters::learn_line
-        let words_iterator = words.split(|c|
-            c == ' ' ||
-            c == '/' ||
-            c == ',' ||
-            c == '.' ||
-            c == ':' ||
-            c == '"' ||
-            c == '\'' ||
-            c == '(' ||
-            c == ')' ||
-            c == '{' ||
-            c == '}' ||
-            c == '[' ||
-            c == ']');
-
+        let words_vec = LogFilters::_line_split(words);
+        
         let mut filter = Vec::new();
-        for word in words_iterator {
+        for word in words_vec {
             filter.push(vec![word.to_string()]);
         }
         return filter;
