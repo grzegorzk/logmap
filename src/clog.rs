@@ -103,7 +103,7 @@ impl LogFilters {
         let log_filters_lines: Vec<&str> = log_filters_str.split('\n').collect();
 
         let mut log_filters = LogFilters::_load_parameters(&log_filters_lines);
-        log_filters._filters_from_lines(&log_filters_lines);
+        log_filters._filters_from_lines(&log_filters_lines, 5);
 
         return log_filters;
     }
@@ -159,8 +159,7 @@ impl LogFilters {
         }
     }
 
-    fn _filters_from_lines(&mut self, log_filters_lines: &Vec<&str>) {
-        let number_of_head_options: usize = 5;
+    fn _filters_from_lines(&mut self, log_filters_lines: &Vec<&str>, number_of_head_options: usize) {
         if log_filters_lines.len() < number_of_head_options + 1 {
             panic!("File is corrupted! At least {} lines expected, found {}",
                 number_of_head_options + 1, log_filters_lines.len())
@@ -233,23 +232,6 @@ impl LogFilters {
         }
     }
 
-    fn _line_split(log_line: &str) -> Vec<String> {
-        log_line.split(|c|
-            c == ' ' ||
-            c == '/' ||
-            c == ',' ||
-            c == '.' ||
-            c == ':' ||
-            c == '"' ||
-            c == '\'' ||
-            c == '(' ||
-            c == ')' ||
-            c == '{' ||
-            c == '}' ||
-            c == '[' ||
-            c == ']').map(|s| s.to_string()).collect()
-    }
-
     pub fn analyze_line(&mut self, log_line: &str) {
         let raw_words = LogFilters::_line_split(log_line);
         let mut words = Vec::new();
@@ -272,6 +254,23 @@ impl LogFilters {
         if self._find_best_matching_filter_index(&words) == -1 {
             eprintln!("{}", log_line);
         }
+    }
+
+    fn _line_split(log_line: &str) -> Vec<String> {
+        log_line.split(|c|
+            c == ' ' ||
+            c == '/' ||
+            c == ',' ||
+            c == '.' ||
+            c == ':' ||
+            c == '"' ||
+            c == '\'' ||
+            c == '(' ||
+            c == ')' ||
+            c == '{' ||
+            c == '}' ||
+            c == '[' ||
+            c == ']').map(|s| s.to_string()).filter(|s| s.len() > 0).collect()
     }
 
     pub fn learn_line(&mut self, log_line: &str) {
@@ -607,6 +606,30 @@ impl LogFilters {
 mod tests {
     use super::*;
 
+    #[test]
+    fn _line_split() {
+        let line_1 = "a b/c,d.e:f\"g\'h(i)j{k}l[m]n";
+        let result = vec!["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k",
+            "l", "m", "n"];
+        assert_eq!(LogFilters::_line_split(&line_1), result);
+
+        let line_2 = " /,.a:\"\'()b{}[]";
+        let result = vec!["a", "b"];
+        assert_eq!(LogFilters::_line_split(&line_2), result);
+
+        let line_3 = " /,.:\"\'(){}[]";
+        let result: Vec<String> = Vec::new();
+        assert_eq!(LogFilters::_line_split(&line_3), result);
+
+        let line_4 = "";
+        let result: Vec<String> = Vec::new();
+        assert_eq!(LogFilters::_line_split(&line_4), result);
+
+        let line_5 = "LoremIpsum";
+        let result = vec!["LoremIpsum"];
+        assert_eq!(LogFilters::_line_split(&line_5), result);
+    }
+
     fn _words_vector_from_string(words: &str) -> Vec<String> {
         LogFilters::_line_split(words)
     }
@@ -703,7 +726,105 @@ mod tests {
         assert_eq!(log_filters._filters_to_string(), result);
     }
 
-    // TODO: cover _load_parameters and _filters_from_lines
+    #[test]
+    fn _load_parameters() {
+        let log_filters_lines = vec!["3", "2", ".", "true", "2", "0"];
+        let log_filters = LogFilters::_load_parameters(&log_filters_lines);
+        assert_eq!(log_filters.min_req_consequent_matches, 3);
+        assert_eq!(log_filters.max_allowed_new_alternatives, 2);
+        assert_eq!(log_filters.denote_optional, ".");
+        assert_eq!(log_filters.ignore_numeric_words, true);
+        assert_eq!(log_filters.ignore_first_columns, 2);
+    }
+
+    #[test]
+    fn _filters_from_lines() {
+        let log_filters_lines = vec![
+        "1",
+        "5",
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"];
+        let mut log_filters = LogFilters::new();
+        log_filters._filters_from_lines(&log_filters_lines, 0);
+        assert_eq!(log_filters.filters.len(), 1);
+        let expected = _simple_filter_from_string("a b c d e");
+        assert_eq!(log_filters.filters[0], expected);
+        assert_eq!(log_filters.words_hash.get(&"a".to_string()).unwrap(),
+            &vec![0 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"b".to_string()).unwrap(),
+            &vec![0 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"c".to_string()).unwrap(),
+            &vec![0 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"d".to_string()).unwrap(),
+            &vec![0 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"e".to_string()).unwrap(),
+            &vec![0 as usize]);
+
+        let log_filters_lines = vec![
+        "1",
+        "3",
+        "a b",
+        "c",
+        "d e"];
+        let mut log_filters = LogFilters::new();
+        log_filters._filters_from_lines(&log_filters_lines, 0);
+        assert_eq!(log_filters.filters.len(), 1);
+        let mut expected = _simple_filter_from_string("a c d");
+        expected = _add_word_alternative(expected, 0, "b");
+        expected = _add_word_alternative(expected, 2, "e");
+        assert_eq!(log_filters.filters[0], expected);
+        assert_eq!(log_filters.words_hash.get(&"a".to_string()).unwrap(),
+            &vec![0 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"b".to_string()).unwrap(),
+            &vec![0 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"c".to_string()).unwrap(),
+            &vec![0 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"d".to_string()).unwrap(),
+            &vec![0 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"e".to_string()).unwrap(),
+            &vec![0 as usize]);
+
+        let log_filters_lines = vec![
+        "2",
+        "5",
+        "a",
+        "b",
+        "c",
+        "d",
+        "e f",
+        "3",
+        "a b",
+        "c",
+        "d e g"];
+        let mut log_filters = LogFilters::new();
+        log_filters._filters_from_lines(&log_filters_lines, 0);
+        assert_eq!(log_filters.filters.len(), 2);
+        let mut expected_1 = _simple_filter_from_string("a b c d e");
+        expected_1 = _add_word_alternative(expected_1, 4, "f");
+        let mut expected_2 = _simple_filter_from_string("a c d");
+        expected_2 = _add_word_alternative(expected_2, 0, "b");
+        expected_2 = _add_word_alternative(expected_2, 2, "e");
+        expected_2 = _add_word_alternative(expected_2, 2, "g");
+        assert_eq!(log_filters.filters[0], expected_1);
+        assert_eq!(log_filters.filters[1], expected_2);
+        assert_eq!(log_filters.words_hash.get(&"a".to_string()).unwrap(),
+            &vec![0 as usize, 1 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"b".to_string()).unwrap(),
+            &vec![0 as usize, 1 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"c".to_string()).unwrap(),
+            &vec![0 as usize, 1 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"d".to_string()).unwrap(),
+            &vec![0 as usize, 1 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"e".to_string()).unwrap(),
+            &vec![0 as usize, 1 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"f".to_string()).unwrap(),
+            &vec![0 as usize]);
+        assert_eq!(log_filters.words_hash.get(&"g".to_string()).unwrap(),
+            &vec![1 as usize]);
+    }
 
     #[test]
     fn _is_word_only_numeric() {
