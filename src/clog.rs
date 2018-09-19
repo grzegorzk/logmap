@@ -83,10 +83,9 @@ impl LogFilters {
             filters_string += &filter.len().to_string();
             for word_alternatives in filter {
                 filters_string += "\n";
-                filters_string += &word_alternatives.len().to_string();
                 for word in word_alternatives {
-                    filters_string += "\n";
                     filters_string += &word;
+                    filters_string += " ";
                 }
             }
         }
@@ -111,16 +110,21 @@ impl LogFilters {
 
     fn _load_parameters(log_filters_lines: &Vec<&str>) -> Self {
         if log_filters_lines.len() < 6 {
-            panic!("File is corrupted! At least 6 lines expected, found {}", log_filters_lines.len())
+            panic!("File is corrupted! At least 6 lines expected, found {}",
+            log_filters_lines.len())
         }
 
-        let min_req_consequent_matches: usize = match log_filters_lines[0].to_string().parse::<usize>() {
-            Err(why) => panic!("Couldn't parse 1st line of input to `usize`: {}, {}", log_filters_lines[0], why.description()),
+        let min_req_consequent_matches: usize = match log_filters_lines[0]
+        .to_string().parse::<usize>() {
+            Err(why) => panic!("Couldn't parse 1st line of input to `usize`: {}, {}",
+                log_filters_lines[0], why.description()),
             Ok(value) => value,
         };
 
-        let max_allowed_new_alternatives: usize = match log_filters_lines[1].to_string().parse::<usize>() {
-            Err(why) => panic!("Couldn't parse 2nd line of input to `usize`: {}, {}", log_filters_lines[1], why.description()),
+        let max_allowed_new_alternatives: usize = match log_filters_lines[1]
+        .to_string().parse::<usize>() {
+            Err(why) => panic!("Couldn't parse 2nd line of input to `usize`: {}, {}",
+                log_filters_lines[1], why.description()),
             Ok(value) => value,
         };
 
@@ -130,13 +134,17 @@ impl LogFilters {
             panic!("3rd line of input cannot be empty!");
         }
 
-        let ignore_numeric_words: bool = match log_filters_lines[3].to_string().parse::<bool>() {
-            Err(why) => panic!("Couldn't parse 4th line of input to `bool`: {}, {}", log_filters_lines[3], why.description()),
+        let ignore_numeric_words: bool = match log_filters_lines[3]
+        .to_string().parse::<bool>() {
+            Err(why) => panic!("Couldn't parse 4th line of input to `bool`: {}, {}",
+                log_filters_lines[3], why.description()),
             Ok(value) => value,
         };
 
-        let ignore_first_columns: usize = match log_filters_lines[4].to_string().parse::<usize>() {
-            Err(why) => panic!("Couldn't parse 5th line of input to `usize`: {}, {}", log_filters_lines[4], why.description()),
+        let ignore_first_columns: usize = match log_filters_lines[4]
+        .to_string().parse::<usize>() {
+            Err(why) => panic!("Couldn't parse 5th line of input to `usize`: {}, {}",
+                log_filters_lines[4], why.description()),
             Ok(value) => value,
         };
 
@@ -152,45 +160,51 @@ impl LogFilters {
     }
 
     fn _filters_from_lines(&mut self, log_filters_lines: &Vec<&str>) {
-        if log_filters_lines.len() < 6 {
-            panic!("File is corrupted! At least 6 lines expected, found {}", log_filters_lines.len())
+        let number_of_head_options: usize = 5;
+        if log_filters_lines.len() < number_of_head_options + 1 {
+            panic!("File is corrupted! At least {} lines expected, found {}",
+                number_of_head_options + 1, log_filters_lines.len())
         }
 
-        let number_of_filters: usize = match log_filters_lines[5].to_string().parse::<usize>() {
-            Err(why) => panic!("Couldn't parse 6th line of input to `usize`: {}, {}", log_filters_lines[5], why.description()),
+        let number_of_filters: usize = match log_filters_lines[number_of_head_options]
+        .to_string().parse::<usize>() {
+            Err(why) => panic!("Couldn't parse 6th line of input to `usize`: {}, {}",
+                log_filters_lines[number_of_head_options], why.description()),
             Ok(value) => value,
         };
 
-        // TODO: simplify and improve readability
-        let mut processed_lines:usize = 0;
+        // TODO: simplify
+        let mut processed_lines:usize = number_of_head_options;
         for _i in 0..number_of_filters {
             processed_lines += 1;
-            let number_of_alternatives: usize = match log_filters_lines[5 + processed_lines].to_string().parse::<usize>() {
-                Err(why) => panic!("Couldn't parse {} line of input to `usize`: {}, {}", 5 + processed_lines, log_filters_lines[5 + processed_lines], why.description()),
+            let number_of_alternatives: usize = match log_filters_lines[processed_lines]
+            .to_string().parse::<usize>() {
+                Err(why) => panic!("Couldn't parse {} line of input to `usize`: {}, {}",
+                    processed_lines, log_filters_lines[processed_lines],
+                    why.description()),
                 Ok(value) => value,
             };
             let mut alternatives = Vec::new();
             let mut include_in_hash = Vec::new();
             for _j in 0..number_of_alternatives {
                 processed_lines += 1;
-                let number_of_words: usize = match log_filters_lines[5 + processed_lines].to_string().parse::<usize>() {
-                    Err(why) => panic!("Couldn't parse {} line of input to `usize`: {}, {}", 5 + processed_lines, log_filters_lines[5 + processed_lines], why.description()),
-                    Ok(value) => value,
-                };
                 let mut words = Vec::new();
-                for _k in 0..number_of_words {
-                    processed_lines += 1;
-                    words.push(log_filters_lines[5 + processed_lines].to_string());
-                    include_in_hash.push(log_filters_lines[5 + processed_lines].to_string());
+                let words_iterator = log_filters_lines[processed_lines].split(' ');
+                for word in words_iterator {
+                    if word.len() == 0 {
+                        continue;
+                    }
+                    words.push(word.to_string());
                 }
+                include_in_hash.extend(words.clone());
                 alternatives.push(words);
             }
             self.filters.push(alternatives);
+            let last_filter_index = self.filters.len() - 1;
             for word in include_in_hash {
-                if word == self.denote_optional {
+                if word.len() == 0 || word == self.denote_optional {
                     continue;
                 }
-                let last_filter_index = self.filters.len() - 1;
                 self._update_hash(&word, last_filter_index)
             }
         }
@@ -704,25 +718,18 @@ mod tests {
 
         _add_test_filter(&mut log_filters, _simple_filter_from_string("aaa bbb ccc ddd"));
         let filter_1 : String = "4
-                                1
-                                aaa
-                                1
-                                bbb
-                                1
-                                ccc
-                                1
-                                ddd".to_string().replace(" ", "");
+                                aaa 
+                                bbb 
+                                ccc 
+                                ddd ".to_string().replace("    ", "");
         let result = "1\n".to_string() + &filter_1;
         assert_eq!(log_filters._filters_to_string(), result);
 
         _add_test_filter(&mut log_filters, _simple_filter_from_string("xxx yyy zzz"));
         let filter_2 : String = "3
-                                1
-                                xxx
-                                1
-                                yyy
-                                1
-                                zzz".to_string().replace(" ", "");
+                                xxx 
+                                yyy 
+                                zzz ".to_string().replace("    ", "");
         let result = "2\n".to_string() + &filter_1 + "\n" + &filter_2;
         assert_eq!(log_filters._filters_to_string(), result);
 
@@ -732,17 +739,10 @@ mod tests {
         complex_filter = _add_word_alternative(complex_filter, 3, ".");
         _add_test_filter(&mut log_filters, complex_filter);
         let filter_3 : String = "4
-                                1
-                                eee
-                                3
-                                fff
-                                iii
-                                jjj
-                                1
-                                ggg
-                                2
-                                hhh
-                                .".to_string().replace(" ", "");
+                                eee 
+                                fff iii jjj 
+                                ggg 
+                                hhh . ".to_string().replace("    ", "");
         let result = "3\n".to_string() + &filter_1 + "\n" + &filter_2 + "\n" + &filter_3;
         assert_eq!(log_filters._filters_to_string(), result);
     }
