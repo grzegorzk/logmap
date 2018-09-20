@@ -13,6 +13,10 @@ pub fn main() {
 
     opts.optopt("l", "load", "Load filters from given path and use to scan logs from input", "PATH");
     opts.optopt("s", "save", "Save filters under given path, does not work when piping", "PATH");
+    opts.optopt("c", "columns", "Ignore first N columns of input\ncolumns are created by splitting line by .,:/[]{}() \'\"\ndefault value: 2\nnote: set this value to a number allowing to ignore time stamp)", "UINT");
+    opts.optopt("a", "allowed-alternatives", "during analysis each new line will be allowed not to match N times\ndefault value: 0\nrecommended value when analysing: 1 or 2", "UINT");
+    opts.optopt("r", "required-matches", "during analysis line will be considered matching with\nfilter if at least N consequetive words are matching\ndefault value: 3", "UINT");
+    opts.optflag("i", "ignore-numeric", "DO NOT ignore words containing only numbers\ndefault value: true (words containing only values are removed before analysing)");
     opts.optflag("m", "map", "Map filters from input (extend already loaded filters if -l was used)");
     opts.optflag("p", "passive", "Works only in conjunction with `l`. Analyse logs using loaded filters.");
     opts.optflag("d", "debug", "Print internal data structure");
@@ -32,6 +36,38 @@ pub fn main() {
     }
 
     let mut log_filters = clog::LogFilters::new();
+    log_filters.ignore_first_columns = 2;
+    log_filters.max_allowed_new_alternatives = 0;
+    log_filters.min_req_consequent_matches = 3;
+    log_filters.ignore_numeric_words = true;
+
+    if matches.opt_str("c").is_some() {
+        log_filters.ignore_first_columns = match matches.opt_str("c").unwrap()
+        .to_string().parse::<usize>() {
+            Err(_) => panic!("Couldn't parse `columns` to UINT: {}",
+                matches.opt_str("c").unwrap()),
+            Ok(value) => value,
+        };
+    }
+    if matches.opt_str("a").is_some() {
+        log_filters.max_allowed_new_alternatives = match matches.opt_str("a").unwrap()
+        .to_string().parse::<usize>() {
+            Err(_) => panic!("Couldn't parse `columns` to UINT: {}",
+                matches.opt_str("a").unwrap()),
+            Ok(value) => value,
+        };
+    }
+    if matches.opt_str("r").is_some() {
+        log_filters.min_req_consequent_matches = match matches.opt_str("r").unwrap()
+        .to_string().parse::<usize>() {
+            Err(_) => panic!("Couldn't parse `columns` to UINT: {}",
+                matches.opt_str("r").unwrap()),
+            Ok(value) => value,
+        };
+    }
+    if matches.opt_str("i").is_some() {
+        log_filters.ignore_numeric_words = false;
+    }
     if matches.opt_str("l").is_some() {
         let file_path_str = matches.opt_str("l").unwrap();
         let load_file_path = Path::new(&file_path_str);
@@ -56,7 +92,6 @@ pub fn main() {
         log_filters.print();
     }
     if matches.opt_present("p") {
-        log_filters.max_allowed_new_alternatives = 0;
         let std_in = io::stdin();
         for line in std_in.lock().lines() {
             let log_line = line.expect("INVALID INPUT!");

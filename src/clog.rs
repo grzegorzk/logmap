@@ -21,15 +21,15 @@ pub struct LogFilters {
     /// Each key stores references to lines containing the key
     words_hash: HashMap<String, Vec<usize>>,
     /// Minimum required consequent matches to consider lines similar
-    min_req_consequent_matches: usize,
+    pub min_req_consequent_matches: usize,
     /// Maximum allowed new alternatives when analysing any new line
     pub max_allowed_new_alternatives: usize,
     /// If `denote_optional` is found within alternatives then column is treated as optional
     denote_optional: String,
     /// Should words that contain only numbers be ignored
-    ignore_numeric_words: bool,
+    pub ignore_numeric_words: bool,
     /// Drop first columns before analysing
-    ignore_first_columns: usize,
+    pub ignore_first_columns: usize,
 }
 
 impl LogFilters {
@@ -41,7 +41,7 @@ impl LogFilters {
             filters: filters,
             words_hash: words_hash,
             min_req_consequent_matches: 3,
-            max_allowed_new_alternatives: 1,
+            max_allowed_new_alternatives: 0,
             // below must never land as word alternative
             denote_optional: ".".to_string(),
             ignore_numeric_words: true,
@@ -250,7 +250,6 @@ impl LogFilters {
                 words.push(word);
             }
         }
-        self.max_allowed_new_alternatives = 0;
         if self._find_best_matching_filter_index(&words) == -1 {
             eprintln!("{}", log_line);
         }
