@@ -232,7 +232,7 @@ impl LogFilters {
         }
     }
 
-    pub fn analyze_line(&mut self, log_line: &str) {
+    pub fn analyze_line(&mut self, log_line: &str) -> bool {
         let raw_words = LogFilters::_line_split(log_line);
         let mut words = Vec::new();
 
@@ -251,8 +251,9 @@ impl LogFilters {
             }
         }
         if self._find_best_matching_filter_index(&words) == -1 {
-            eprintln!("{}", log_line);
+            return false;
         }
+        return true;
     }
 
     fn _line_split(log_line: &str) -> Vec<String> {
