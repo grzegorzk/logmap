@@ -61,7 +61,7 @@ impl LogFilters {
         log_filters_str += "\n";
         log_filters_str += &self.ignore_first_columns.to_string();
         log_filters_str += "\n";
-        log_filters_str += &self._filters_to_string();
+        log_filters_str += &self._to_string();
 
         let path_display = path.display();
         let mut file = match File::create(&path) {
@@ -76,7 +76,7 @@ impl LogFilters {
         }
     }
 
-    fn _filters_to_string(&self) -> String {
+    fn _to_string(&self) -> String {
         let mut filters_string : String = self.filters.len().to_string();
         for filter in &self.filters {
             filters_string += "\n";
@@ -103,7 +103,7 @@ impl LogFilters {
         let log_filters_lines: Vec<&str> = log_filters_str.split('\n').collect();
 
         let mut log_filters = LogFilters::_load_parameters(&log_filters_lines);
-        log_filters._filters_from_lines(&log_filters_lines, 5);
+        log_filters._from_str_lines(&log_filters_lines, 5);
 
         return log_filters;
     }
@@ -159,7 +159,7 @@ impl LogFilters {
         }
     }
 
-    fn _filters_from_lines(&mut self, log_filters_lines: &Vec<&str>, number_of_head_options: usize) {
+    fn _from_str_lines(&mut self, log_filters_lines: &Vec<&str>, number_of_head_options: usize) {
         if log_filters_lines.len() < number_of_head_options + 1 {
             panic!("File is corrupted! At least {} lines expected, found {}",
                 number_of_head_options + 1, log_filters_lines.len())
@@ -232,28 +232,31 @@ impl LogFilters {
         }
     }
 
-    pub fn analyze_line(&mut self, log_line: &str) -> bool {
+    pub fn is_line_known(&mut self, log_line: &str) -> bool {
+        let words = self._line_to_words(&log_line);
+        if self._find_best_matching_filter_index(&words) == -1 {
+            return false;
+        }
+        return true;
+    }
+
+    fn _line_to_words(&self, log_line: &str) -> Vec<String> {
         let raw_words = LogFilters::_line_split(log_line);
         let mut words = Vec::new();
 
         let mut i = 0;
         for word in raw_words {
             let word = word.to_string();
-            if word.len() > 0 {
-                if self.ignore_numeric_words && self._is_word_only_numeric(&word) {
-                    continue;
-                }
-                if i < self.ignore_first_columns {
-                    i += 1;
-                    continue;
-                }
-                words.push(word);
+            if self.ignore_numeric_words && self._is_word_only_numeric(&word) {
+                continue;
             }
+            if i < self.ignore_first_columns {
+                i += 1;
+                continue;
+            }
+            words.push(word);
         }
-        if self._find_best_matching_filter_index(&words) == -1 {
-            return false;
-        }
-        return true;
+        return words;
     }
 
     fn _line_split(log_line: &str) -> Vec<String> {
@@ -274,23 +277,7 @@ impl LogFilters {
     }
 
     pub fn learn_line(&mut self, log_line: &str) {
-        let raw_words = LogFilters::_line_split(log_line);
-        let mut words = Vec::new();
-
-        let mut i = 0;
-        for word in raw_words {
-            let word = word.to_string();
-            if word.len() > 0 {
-                if self.ignore_numeric_words && self._is_word_only_numeric(&word) {
-                    continue;
-                }
-                if i < self.ignore_first_columns {
-                    i += 1;
-                    continue;
-                }
-                words.push(word);
-            }
-        }
+        let words = self._line_to_words(&log_line);
         // TODO: shorter lines should be correctly processed and not result in duplicated filters
         if words.len() > self.min_req_consequent_matches - self.max_allowed_new_alternatives {
             let matched_filter_index = self._find_best_matching_filter_index(&words);
@@ -630,6 +617,79 @@ mod tests {
         assert_eq!(LogFilters::_line_split(&line_5), result);
     }
 
+    #[test]
+    fn _line_to_words() {
+        let mut log_filters = LogFilters::new();
+        log_filters.ignore_numeric_words = false;
+        log_filters.ignore_first_columns = 0;
+
+        // Test if string will be splitted correctly (single separators)
+        let line_1 = "a b/c,d.e:f\"g\'h(i)j{k}l[m]n";
+        let result = vec!["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k",
+            "l", "m", "n"];
+        assert_eq!(log_filters._line_to_words(&line_1), result);
+
+        // Test if string will be splitted correctly (multiple separators)
+        let line_2 = " /,.a:\"\'()b{}[]";
+        let result = vec!["a", "b"];
+        assert_eq!(log_filters._line_to_words(&line_2), result);
+
+        // Empty string expected if line consisting of only separators
+        let line_3 = " /,.:\"\'(){}[]";
+        let result: Vec<String> = Vec::new();
+        assert_eq!(log_filters._line_to_words(&line_3), result);
+
+        let line_4 = "";
+        let result: Vec<String> = Vec::new();
+        assert_eq!(log_filters._line_to_words(&line_4), result);
+
+        // Test if string will be splitted correctly (no separators)
+        let line_5 = "LoremIpsum";
+        let result = vec!["LoremIpsum"];
+        assert_eq!(log_filters._line_to_words(&line_5), result);
+
+
+        // Following tests for LogFilters::ignore_first_columns parameter set to `2`
+        let mut log_filters = LogFilters::new();
+        log_filters.ignore_numeric_words = false;
+        log_filters.ignore_first_columns = 2;
+
+        // Test if string will be splitted correctly (single separators)
+        let line_1 = "a b/c,d.e:f\"g\'h(i)j{k}l[m]n";
+        let result = vec!["c", "d", "e", "f", "g", "h", "i", "j", "k",
+            "l", "m", "n"];
+        assert_eq!(log_filters._line_to_words(&line_1), result);
+
+        // Test if string will be splitted correctly (multiple separators)
+        let line_2 = " /,.a:\"\'()b{}[]c[]{}.,";
+        let result = vec!["c"];
+        assert_eq!(log_filters._line_to_words(&line_2), result);
+
+        // Empty string expected if line consisting of only separators
+        let line_3 = " /,.:\"\'(){}[]";
+        let result: Vec<String> = Vec::new();
+        assert_eq!(log_filters._line_to_words(&line_3), result);
+
+        let line_4 = "";
+        let result: Vec<String> = Vec::new();
+        assert_eq!(log_filters._line_to_words(&line_4), result);
+
+        // First two words should be removed, numeric word should stay
+        let line_5 = "Lorem ipsum dolor sit amet, 123 consectetur adipiscing elit7";
+        let result = vec!["dolor", "sit", "amet", "123", "consectetur", "adipiscing", "elit7"];
+        assert_eq!(log_filters._line_to_words(&line_5), result);
+
+        // Test if numeric words will be ignored
+        let mut log_filters = LogFilters::new();
+        log_filters.ignore_numeric_words = true;
+        log_filters.ignore_first_columns = 2;
+
+        // First two words and numeric word should be removed
+        let line_5 = "Lorem ipsum dolor sit amet, 123 consectetur adipiscing elit7";
+        let result = vec!["dolor", "sit", "amet", "consectetur", "adipiscing", "elit7"];
+        assert_eq!(log_filters._line_to_words(&line_5), result);
+    }
+
     fn _words_vector_from_string(words: &str) -> Vec<String> {
         LogFilters::_line_split(words)
     }
@@ -691,9 +751,9 @@ mod tests {
     }
 
     #[test]
-    fn _filters_to_string() {
+    fn _to_string() {
         let mut log_filters = LogFilters::new();
-        assert_eq!(log_filters._filters_to_string(), "0");
+        assert_eq!(log_filters._to_string(), "0");
 
         _add_test_filter(&mut log_filters, _simple_filter_from_string("aaa bbb ccc ddd"));
         let filter_1 : String = "4
@@ -702,7 +762,7 @@ mod tests {
                                 ccc 
                                 ddd ".to_string().replace("    ", "");
         let result = "1\n".to_string() + &filter_1;
-        assert_eq!(log_filters._filters_to_string(), result);
+        assert_eq!(log_filters._to_string(), result);
 
         _add_test_filter(&mut log_filters, _simple_filter_from_string("xxx yyy zzz"));
         let filter_2 : String = "3
@@ -710,7 +770,7 @@ mod tests {
                                 yyy 
                                 zzz ".to_string().replace("    ", "");
         let result = "2\n".to_string() + &filter_1 + "\n" + &filter_2;
-        assert_eq!(log_filters._filters_to_string(), result);
+        assert_eq!(log_filters._to_string(), result);
 
         let mut complex_filter = _simple_filter_from_string("eee fff ggg hhh");
         complex_filter = _add_word_alternative(complex_filter, 1, "iii");
@@ -723,7 +783,7 @@ mod tests {
                                 ggg 
                                 hhh . ".to_string().replace("    ", "");
         let result = "3\n".to_string() + &filter_1 + "\n" + &filter_2 + "\n" + &filter_3;
-        assert_eq!(log_filters._filters_to_string(), result);
+        assert_eq!(log_filters._to_string(), result);
     }
 
     #[test]
@@ -738,7 +798,7 @@ mod tests {
     }
 
     #[test]
-    fn _filters_from_lines() {
+    fn _from_str_lines() {
         let log_filters_lines = vec![
         "1",
         "5",
@@ -748,7 +808,7 @@ mod tests {
         "d",
         "e"];
         let mut log_filters = LogFilters::new();
-        log_filters._filters_from_lines(&log_filters_lines, 0);
+        log_filters._from_str_lines(&log_filters_lines, 0);
         assert_eq!(log_filters.filters.len(), 1);
         let expected = _simple_filter_from_string("a b c d e");
         assert_eq!(log_filters.filters[0], expected);
@@ -770,7 +830,7 @@ mod tests {
         "c",
         "d e"];
         let mut log_filters = LogFilters::new();
-        log_filters._filters_from_lines(&log_filters_lines, 0);
+        log_filters._from_str_lines(&log_filters_lines, 0);
         assert_eq!(log_filters.filters.len(), 1);
         let mut expected = _simple_filter_from_string("a c d");
         expected = _add_word_alternative(expected, 0, "b");
@@ -800,7 +860,7 @@ mod tests {
         "c",
         "d e g"];
         let mut log_filters = LogFilters::new();
-        log_filters._filters_from_lines(&log_filters_lines, 0);
+        log_filters._from_str_lines(&log_filters_lines, 0);
         assert_eq!(log_filters.filters.len(), 2);
         let mut expected_1 = _simple_filter_from_string("a b c d e");
         expected_1 = _add_word_alternative(expected_1, 4, "f");
