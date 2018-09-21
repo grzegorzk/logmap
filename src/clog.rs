@@ -77,6 +77,8 @@ impl LogFilters {
     }
 
     fn _to_string(&self) -> String {
+        // TODO: remove numbers, use empty lines as separators between filters
+        // TODO: consider saving filters in single line with brackets
         let mut filters_string : String = self.filters.len().to_string();
         for filter in &self.filters {
             filters_string += "\n";
@@ -595,15 +597,18 @@ mod tests {
 
     #[test]
     fn _line_split() {
+        // Test if string will be splitted correctly (single separators)
         let line_1 = "a b/c,d.e:f\"g\'h(i)j{k}l[m]n";
         let result = vec!["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k",
             "l", "m", "n"];
         assert_eq!(LogFilters::_line_split(&line_1), result);
 
+        // Test if string will be splitted correctly (multiple separators)
         let line_2 = " /,.a:\"\'()b{}[]";
         let result = vec!["a", "b"];
         assert_eq!(LogFilters::_line_split(&line_2), result);
 
+        // Empty string expected if line consisting of only separators
         let line_3 = " /,.:\"\'(){}[]";
         let result: Vec<String> = Vec::new();
         assert_eq!(LogFilters::_line_split(&line_3), result);
@@ -690,10 +695,12 @@ mod tests {
         assert_eq!(log_filters._line_to_words(&line_5), result);
     }
 
+    // Helper
     fn _words_vector_from_string(words: &str) -> Vec<String> {
         LogFilters::_line_split(words)
     }
 
+    // Helper
     fn _simple_filter_from_string(words: &str) -> Vec<Vec<String>> {
         let words_vec = LogFilters::_line_split(words);
         
@@ -704,6 +711,7 @@ mod tests {
         return filter;
     }
 
+    // Helper
     fn _add_word_alternative(mut filter: Vec<Vec<String>>, index: usize, word: &str) -> Vec<Vec<String>> {
         if filter.get(index).is_some() {
             filter.get_mut(index).unwrap().push(word.to_string());
@@ -715,6 +723,7 @@ mod tests {
         }
     }
 
+    // Helper
     fn _add_test_filter(test_filters: &mut LogFilters, filter: Vec<Vec<String>>) {
         let next_filter_index = test_filters.filters.len();
         for word_alternatives in &filter {
@@ -733,6 +742,7 @@ mod tests {
         test_filters.filters.push(filter);
     }
 
+    // Helper
     fn _init_test_data() -> LogFilters {
         let mut log_filters = LogFilters::new();
         let mut complex_filter = _simple_filter_from_string("aaa qqq ccc sss");
@@ -752,9 +762,11 @@ mod tests {
 
     #[test]
     fn _to_string() {
+        // TODO: cover incorrect input
         let mut log_filters = LogFilters::new();
         assert_eq!(log_filters._to_string(), "0");
 
+        // One filter with no alternatives
         _add_test_filter(&mut log_filters, _simple_filter_from_string("aaa bbb ccc ddd"));
         let filter_1 : String = "4
                                 aaa 
@@ -764,6 +776,7 @@ mod tests {
         let result = "1\n".to_string() + &filter_1;
         assert_eq!(log_filters._to_string(), result);
 
+        // Two filters with no alternatives
         _add_test_filter(&mut log_filters, _simple_filter_from_string("xxx yyy zzz"));
         let filter_2 : String = "3
                                 xxx 
@@ -772,6 +785,7 @@ mod tests {
         let result = "2\n".to_string() + &filter_1 + "\n" + &filter_2;
         assert_eq!(log_filters._to_string(), result);
 
+        // Three filters, third filter with alternatives
         let mut complex_filter = _simple_filter_from_string("eee fff ggg hhh");
         complex_filter = _add_word_alternative(complex_filter, 1, "iii");
         complex_filter = _add_word_alternative(complex_filter, 1, "jjj");
@@ -788,6 +802,7 @@ mod tests {
 
     #[test]
     fn _load_parameters() {
+        // TODO: cover incorrect input
         let log_filters_lines = vec!["3", "2", ".", "true", "2", "0"];
         let log_filters = LogFilters::_load_parameters(&log_filters_lines);
         assert_eq!(log_filters.min_req_consequent_matches, 3);
@@ -799,6 +814,8 @@ mod tests {
 
     #[test]
     fn _from_str_lines() {
+        // TODO: cover incorrect input
+        // Filter with no alternatives
         let log_filters_lines = vec![
         "1",
         "5",
@@ -823,6 +840,7 @@ mod tests {
         assert_eq!(log_filters.words_hash.get(&"e".to_string()).unwrap(),
             &vec![0 as usize]);
 
+        // Filter with alternatives
         let log_filters_lines = vec![
         "1",
         "3",
@@ -847,6 +865,7 @@ mod tests {
         assert_eq!(log_filters.words_hash.get(&"e".to_string()).unwrap(),
             &vec![0 as usize]);
 
+        // Two filters
         let log_filters_lines = vec![
         "2",
         "5",
