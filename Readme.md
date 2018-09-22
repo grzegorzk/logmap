@@ -19,7 +19,7 @@ Once built copy binary from following location:
 `./target/release/flog`
 
 If you want to you can also run tests to see if everything works as expected:
-`cargo test`
+`cargo test --features=tst_utils`
 
 # Usage
 

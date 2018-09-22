@@ -5,3 +5,6 @@ authors = ["Grzegorz Klimaszewski <grzegorz(guess)klimaszewski(guess)gmail(guess
 
 [dependencies]
 getopts = "0.2"
+
+[features]
+tst_utils = []
