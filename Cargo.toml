@@ -1,5 +1,5 @@
 [package]
-name = "clog"
+name = "flog"
 version = "0.0.2"
 authors = ["Grzegorz Klimaszewski <grzegorz(guess)klimaszewski(guess)gmail(guess)com>"]
 

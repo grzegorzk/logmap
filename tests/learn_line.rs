@@ -1,4 +1,4 @@
-extern crate clog;
+extern crate flog;
 
 #[test]
 fn no_alternatives_allowed() {
