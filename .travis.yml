@@ -1,0 +1,13 @@
+language:
+   - rust
+
+script:
+    - cargo build --release
+    - cargo test --features=tst_utils
+
+branches:
+  only:
+    - master
+
+notifications:
+email: false
