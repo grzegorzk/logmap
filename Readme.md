@@ -3,6 +3,8 @@
 Tool helps to spot new behavior in your logs so you don't have to analyze 1000s
 of lines yourself. Create log filters from known logs. Use filters to flag unknown logs.
 
+[![Build Status](https://travis-ci.com/grzegorzk/flog.svg?branch=master)](https://travis-ci.com/grzegorzk/flog)
+
 # Prerequisites
 
 You need to have `Rust` installed in your system. For further details please see:
