@@ -3,7 +3,10 @@ language:
 
 script:
     - cargo build --release
-    - cargo test --features=tst_utils
+    # Run unit tests:
+    - cargo test --lib --features=tst_utils -- --test-threads=5
+    # Run integration tests:
+    - cargo test --test learn_line --features=tst_utils -- --test-threads=5
 
 branches:
   only:
