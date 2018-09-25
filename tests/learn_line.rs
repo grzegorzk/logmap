@@ -1,4 +1,4 @@
-extern crate flog;
+extern crate logmap;
 
 #[test]
 fn no_alternatives_allowed() {

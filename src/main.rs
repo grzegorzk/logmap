@@ -5,7 +5,7 @@ use std::process::exit;
 use std::path::Path;
 use std::env;
 
-mod flog;
+mod logmap;
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -35,7 +35,7 @@ pub fn main() {
         exit(0);
     }
 
-    let mut log_filters = flog::LogFilters::new();
+    let mut log_filters = logmap::LogFilters::new();
     log_filters.ignore_first_columns = 2;
     log_filters.max_allowed_new_alternatives = 0;
     log_filters.min_req_consequent_matches = 3;
@@ -71,7 +71,7 @@ pub fn main() {
     if matches.opt_str("l").is_some() {
         let file_path_str = matches.opt_str("l").unwrap();
         let load_file_path = Path::new(&file_path_str);
-        log_filters = flog::LogFilters::load(load_file_path);
+        log_filters = logmap::LogFilters::load(load_file_path);
     }
     if matches.opt_present("m") {
         log_filters.max_allowed_new_alternatives = 2;
