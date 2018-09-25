@@ -1,9 +1,9 @@
-# flog
+# logmap
 
 Tool helps to spot new behavior in your logs so you don't have to analyze 1000s
 of lines yourself. Create log filters from known logs. Use filters to flag unknown logs.
 
-[![Build Status](https://travis-ci.com/grzegorzk/flog.svg?branch=master)](https://travis-ci.com/grzegorzk/flog)
+[![Build Status](https://travis-ci.com/grzegorzk/logmap.svg?branch=master)](https://travis-ci.com/grzegorzk/logmap)
 
 # Prerequisites
 
@@ -18,7 +18,7 @@ Build binary from sources:
 `cargo build --release`
 
 Once built copy binary from following location:
-`./target/release/flog`
+`./target/release/logmap`
 
 If you want to you can also run tests to see if everything works as expected:
 `cargo test --features=tst_utils`
@@ -26,14 +26,14 @@ If you want to you can also run tests to see if everything works as expected:
 # Usage
 
 Analyse logs and save filters to a file (example with systemd):
-`journalctl --since "10 years ago" -nall | ./target/release/flog -m -s flog.result`
+`journalctl --since "10 years ago" -nall | ./target/release/logmap -m -s logmap.result`
 
 Filter today's logs to see if there is anything that would require attention:
-`journalctl --since "1 day ago" -nall | ./target/release/flog -l flog.result -p`
+`journalctl --since "1 day ago" -nall | ./target/release/logmap -l logmap.result -p`
 
 # How it works
 
-`flog` counts matching words across known filters.
+`logmap` counts matching words across known filters.
 
 If invoked in learning mode it will allow some words not to match and extend
 best-matching filter to contain some word alternatives. If no best-matching filter
