@@ -1,6 +1,6 @@
 [package]
 name = "logmap"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Grzegorz Klimaszewski <grzegorz(guess)klimaszewski(guess)gmail(guess)com>"]
 
 [dependencies]
