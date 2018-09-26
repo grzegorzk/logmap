@@ -61,7 +61,7 @@ impl LogFilters {
         log_filters_str += "\n";
         log_filters_str += &self.ignore_first_columns.to_string();
         log_filters_str += "\n";
-        log_filters_str += &self._to_string();
+        log_filters_str += &self.to_string();
 
         let path_display = path.display();
         let mut file = match File::create(&path) {
@@ -76,21 +76,25 @@ impl LogFilters {
         }
     }
 
-    fn _to_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         // TODO: remove numbers, use empty lines as separators between filters
         // TODO: consider saving filters in single line with brackets
-        let mut filters_string : String = self.filters.len().to_string();
+        let mut filters_string : String = String::new();
         for filter in &self.filters {
-            filters_string += "\n";
-            filters_string += &filter.len().to_string();
             for word_alternatives in filter {
-                filters_string += "\n";
+                filters_string += "[";
                 for word in word_alternatives {
                     filters_string += &word;
-                    filters_string += " ";
+                    filters_string += ",";
                 }
+                filters_string.pop();
+                filters_string += "],";
             }
+            filters_string.pop();
+            filters_string += ",\n";
         }
+        filters_string.pop();
+        filters_string.pop();
         return filters_string;
     }
 
@@ -105,7 +109,7 @@ impl LogFilters {
         let log_filters_lines: Vec<&str> = log_filters_str.split('\n').collect();
 
         let mut log_filters = LogFilters::_load_parameters(&log_filters_lines);
-        log_filters._from_str_lines(&log_filters_lines, 5);
+        log_filters._from_str_lines(&log_filters_lines);
 
         return log_filters;
     }
@@ -161,42 +165,18 @@ impl LogFilters {
         }
     }
 
-    fn _from_str_lines(&mut self, log_filters_lines: &Vec<&str>, number_of_head_options: usize) {
-        if log_filters_lines.len() < number_of_head_options + 1 {
-            panic!("File is corrupted! At least {} lines expected, found {}",
-                number_of_head_options + 1, log_filters_lines.len())
-        }
-
-        let number_of_filters: usize = match log_filters_lines[number_of_head_options]
-        .to_string().parse::<usize>() {
-            Err(why) => panic!("Couldn't parse 6th line of input to `usize`: {}, {}",
-                log_filters_lines[number_of_head_options], why.description()),
-            Ok(value) => value,
-        };
-
-        // TODO: simplify
-        let mut processed_lines:usize = number_of_head_options;
-        for _i in 0..number_of_filters {
-            processed_lines += 1;
-            let number_of_alternatives: usize = match log_filters_lines[processed_lines]
-            .to_string().parse::<usize>() {
-                Err(why) => panic!("Couldn't parse {} line of input to `usize`: {}, {}",
-                    processed_lines, log_filters_lines[processed_lines],
-                    why.description()),
-                Ok(value) => value,
-            };
+    fn _from_str_lines(&mut self, log_filters_lines: &Vec<&str>) {
+        for line in log_filters_lines {
+            if !line.contains("[") || !line.contains("]") {
+                continue;
+            }
             let mut alternatives = Vec::new();
             let mut include_in_hash = Vec::new();
-            for _j in 0..number_of_alternatives {
-                processed_lines += 1;
-                let mut words = Vec::new();
-                let words_iterator = log_filters_lines[processed_lines].split(' ');
-                for word in words_iterator {
-                    if word.len() == 0 {
-                        continue;
-                    }
-                    words.push(word.to_string());
-                }
+            let alts_iter = line.split(|c| c == '[' || c == ']')
+                .map(|s| s.to_string()).filter(|s| s.len() > 0 && s != ",");
+            for alternative in alts_iter {
+                let words: Vec<String> = alternative.split(",")
+                    .map(|s| s.to_string()).filter(|s| s.len() > 0).collect();
                 include_in_hash.extend(words.clone());
                 alternatives.push(words);
             }
@@ -761,31 +741,24 @@ mod tests {
     }
 
     #[test]
-    fn _to_string() {
+    fn to_string() {
         // TODO: cover incorrect input
         let mut log_filters = LogFilters::new();
-        assert_eq!(log_filters._to_string(), "0");
+        assert_eq!(log_filters.to_string(), "");
 
         // One filter with no alternatives
         tst_utils::_add_test_filter(&mut log_filters,
             tst_utils::_simple_filter_from_string("aaa bbb ccc ddd"));
-        let filter_1 : String = "4
-                                aaa 
-                                bbb 
-                                ccc 
-                                ddd ".to_string().replace("    ", "");
-        let result = "1\n".to_string() + &filter_1;
-        assert_eq!(log_filters._to_string(), result);
+        let filter_1 : String = "[aaa],[bbb],[ccc],[ddd]".to_string();
+        let result = filter_1.clone();
+        assert_eq!(log_filters.to_string(), result);
 
         // Two filters with no alternatives
         tst_utils::_add_test_filter(&mut log_filters,
             tst_utils::_simple_filter_from_string("xxx yyy zzz"));
-        let filter_2 : String = "3
-                                xxx 
-                                yyy 
-                                zzz ".to_string().replace("    ", "");
-        let result = "2\n".to_string() + &filter_1 + "\n" + &filter_2;
-        assert_eq!(log_filters._to_string(), result);
+        let filter_2 : String = "[xxx],[yyy],[zzz]".to_string();
+        let result = filter_1.clone() + ",\n" + &filter_2;
+        assert_eq!(log_filters.to_string(), result);
 
         // Three filters, third filter with alternatives
         let mut complex_filter = tst_utils::_simple_filter_from_string("eee fff ggg hhh");
@@ -793,13 +766,9 @@ mod tests {
         complex_filter = tst_utils::_add_word_alternative(complex_filter, 1, "jjj");
         complex_filter = tst_utils::_add_word_alternative(complex_filter, 3, ".");
         tst_utils::_add_test_filter(&mut log_filters, complex_filter);
-        let filter_3 : String = "4
-                                eee 
-                                fff iii jjj 
-                                ggg 
-                                hhh . ".to_string().replace("    ", "");
-        let result = "3\n".to_string() + &filter_1 + "\n" + &filter_2 + "\n" + &filter_3;
-        assert_eq!(log_filters._to_string(), result);
+        let filter_3 : String = "[eee],[fff,iii,jjj],[ggg],[hhh,.]".to_string();
+        let result = filter_1.clone() + ",\n" + &filter_2 + ",\n" + &filter_3;
+        assert_eq!(log_filters.to_string(), result);
     }
 
     #[test]
@@ -818,16 +787,13 @@ mod tests {
     fn _from_str_lines() {
         // TODO: cover incorrect input
         // Filter with no alternatives
-        let log_filters_lines = vec![
-        "1",
-        "5",
-        "a",
-        "b",
-        "c",
-        "d",
-        "e"];
+        let log_filters_lines = vec!["[a],[b],[c],[d],[e]"];
         let mut log_filters = LogFilters::new();
-        log_filters._from_str_lines(&log_filters_lines, 0);
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
+        log_filters.ignore_numeric_words = true;
+        log_filters.ignore_first_columns = 2;
+        log_filters._from_str_lines(&log_filters_lines);
         assert_eq!(log_filters.filters.len(), 1);
         let expected = tst_utils::_simple_filter_from_string("a b c d e");
         assert_eq!(log_filters.filters[0], expected);
@@ -843,14 +809,13 @@ mod tests {
             &vec![0 as usize]);
 
         // Filter with alternatives
-        let log_filters_lines = vec![
-        "1",
-        "3",
-        "a b",
-        "c",
-        "d e"];
+        let log_filters_lines = vec!["[a,b],[c],[d,e]"];
         let mut log_filters = LogFilters::new();
-        log_filters._from_str_lines(&log_filters_lines, 0);
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
+        log_filters.ignore_numeric_words = true;
+        log_filters.ignore_first_columns = 2;
+        log_filters._from_str_lines(&log_filters_lines);
         assert_eq!(log_filters.filters.len(), 1);
         let mut expected = tst_utils::_simple_filter_from_string("a c d");
         expected = tst_utils::_add_word_alternative(expected, 0, "b");
@@ -868,20 +833,14 @@ mod tests {
             &vec![0 as usize]);
 
         // Two filters
-        let log_filters_lines = vec![
-        "2",
-        "5",
-        "a",
-        "b",
-        "c",
-        "d",
-        "e f",
-        "3",
-        "a b",
-        "c",
-        "d e g"];
+        let log_filters_lines = vec!["[a],[b],[c],[d],[e,f]",
+        "[a,b],[c],[d,e,g]"];
         let mut log_filters = LogFilters::new();
-        log_filters._from_str_lines(&log_filters_lines, 0);
+        log_filters.max_allowed_new_alternatives = 1;
+        log_filters.min_req_consequent_matches = 3;
+        log_filters.ignore_numeric_words = true;
+        log_filters.ignore_first_columns = 2;
+        log_filters._from_str_lines(&log_filters_lines);
         assert_eq!(log_filters.filters.len(), 2);
         let mut expected_1 = tst_utils::_simple_filter_from_string("a b c d e");
         expected_1 = tst_utils::_add_word_alternative(expected_1, 4, "f");
