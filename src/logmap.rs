@@ -77,8 +77,6 @@ impl LogFilters {
     }
 
     pub fn to_string(&self) -> String {
-        // TODO: remove numbers, use empty lines as separators between filters
-        // TODO: consider saving filters in single line with brackets
         let mut filters_string : String = String::new();
         for filter in &self.filters {
             for word_alternatives in filter {
