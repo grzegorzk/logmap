@@ -74,7 +74,6 @@ pub fn main() {
         log_filters = logmap::LogFilters::load(load_file_path);
     }
     if matches.opt_present("m") {
-        log_filters.max_allowed_new_alternatives = 2;
         let std_in = io::stdin();
         let mut icnt = 0;
         for line in std_in.lock().lines() {
