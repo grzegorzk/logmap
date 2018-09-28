@@ -21,6 +21,9 @@ pub struct LogFilters {
     /// Each key stores references to lines containing the key
     words_hash: HashMap<String, Vec<usize>>,
     /// Minimum required consequent matches to consider lines similar
+    /// TODO: this parameter is redundant and should be removed
+    ///       as the tool should always aim for best match
+    ///       if user does not want alternatives then next parameter should be set to 0
     pub min_req_consequent_matches: usize,
     /// Maximum allowed new alternatives when analysing any new line
     pub max_allowed_new_alternatives: usize,
@@ -258,15 +261,13 @@ impl LogFilters {
 
     pub fn learn_line(&mut self, log_line: &str) {
         let words = self._line_to_words(&log_line);
-        // TODO: shorter lines should be correctly processed and not result in duplicated filters
-        if words.len() > self.min_req_consequent_matches - self.max_allowed_new_alternatives {
-            let matched_filter_index = self._find_best_matching_filter_index(&words);
-            if matched_filter_index >= 0 {
-                self._update_filter(words, matched_filter_index as usize);
-            }
-            else {
-                self._add_filter(words);
-            }
+
+        let matched_filter_index = self._find_best_matching_filter_index(&words);
+        if matched_filter_index >= 0 {
+            self._update_filter(words, matched_filter_index as usize);
+        }
+        else {
+            self._add_filter(words);
         }
     }
 
@@ -289,15 +290,14 @@ impl LogFilters {
                 best_matching_filter_index = filter_index as isize;
             }
         }
-        if words.len() > self.min_req_consequent_matches {
-            if max_consequent_matches >= self.min_req_consequent_matches {
-                return best_matching_filter_index;
-            }
+        // TODO: warning if more than one line was found with same max_consequent_matches
+        // min_req_consequent_matches cannot be higher than length of analyzed line
+        let mut compensate_short_lines : usize = 0;
+        if words.len() < self.min_req_consequent_matches {
+            compensate_short_lines = self.min_req_consequent_matches - words.len();
         }
-        else {
-            if words.len() == max_consequent_matches {
-                return best_matching_filter_index;
-            }
+        if max_consequent_matches >= self.min_req_consequent_matches - compensate_short_lines - self.max_allowed_new_alternatives {
+            return best_matching_filter_index;
         }
         return -1;
     }
@@ -320,11 +320,13 @@ impl LogFilters {
                 matches = matches + 1;
             }
 
-            let mut extra_allowed_new_alternatives : usize = 0;
+            // min_req_consequent_matches cannot be higher than length of analyzed line
+            let mut compensate_short_lines : usize = 0;
             if words.len() < self.min_req_consequent_matches {
-                extra_allowed_new_alternatives = self.min_req_consequent_matches - words.len();
+                compensate_short_lines = self.min_req_consequent_matches - words.len();
             }
-            if matches >= self.min_req_consequent_matches - self.max_allowed_new_alternatives - extra_allowed_new_alternatives {
+
+            if matches >= self.min_req_consequent_matches - self.max_allowed_new_alternatives - compensate_short_lines {
                 matches = 0;
                 filter_indexes_with_min_req_matches.push(filter_index);
                 last_inserted_index = filter_index as isize;
@@ -920,8 +922,17 @@ mod tests {
         assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
         let words = tst_utils::_words_vector_from_string("ccc bbb aaa");
         assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
+
+        // TODO: If one alternative is allowed and line contains only two words
+        // then, in fact, one-word line is compared (which may be a problematic situation)
+        log_filters.max_allowed_new_alternatives = 0;
         let words = tst_utils::_words_vector_from_string("bbb aaa");
         assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
+        log_filters.max_allowed_new_alternatives = 1;
+        let words = tst_utils::_words_vector_from_string("bbb aaa");
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+
+        // TODO: more unit-tests to cover edge cases for min_req_consequent_matches
     }
 
     #[test]
@@ -963,6 +974,8 @@ mod tests {
         // We are not checking for correct words order here
         let words = tst_utils::_words_vector_from_string("ddd lll zzz yyy aaa");
         assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0, 5]);
+
+        // TODO: more unit-tests to cover edge cases for min_req_consequent_matches
     }
 
     #[test]
