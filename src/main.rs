@@ -15,7 +15,6 @@ pub fn main() {
     opts.optopt("s", "save", "Save filters under given path, does not work when piping", "PATH");
     opts.optopt("c", "columns", "Ignore first N columns of input\ncolumns are created by splitting line by .,:/[]{}() \'\"\ndefault value: 2\nnote: set this value to a number allowing to ignore time stamp)", "UINT");
     opts.optopt("a", "allowed-alternatives", "during analysis each new line will be allowed not to match N times\ndefault value: 0\nrecommended value when analysing: 1 or 2", "UINT");
-    opts.optopt("r", "required-matches", "during analysis line will be considered matching with\nfilter if at least N consequetive words are matching\ndefault value: 3", "UINT");
     opts.optflag("i", "ignore-numeric", "DO NOT ignore words containing only numbers\ndefault value: true (words containing only values are removed before analysing)");
     opts.optflag("m", "map", "Map filters from input (extend already loaded filters if -l was used)");
     opts.optflag("p", "passive", "Works only in conjunction with `l`. Analyse logs using loaded filters.");
@@ -38,7 +37,6 @@ pub fn main() {
     let mut log_filters = logmap::LogFilters::new();
     log_filters.ignore_first_columns = 2;
     log_filters.max_allowed_new_alternatives = 0;
-    log_filters.min_req_consequent_matches = 3;
     log_filters.ignore_numeric_words = true;
 
     if matches.opt_str("c").is_some() {
@@ -54,14 +52,6 @@ pub fn main() {
         .to_string().parse::<usize>() {
             Err(_) => panic!("Couldn't parse `columns` to UINT: {}",
                 matches.opt_str("a").unwrap()),
-            Ok(value) => value,
-        };
-    }
-    if matches.opt_str("r").is_some() {
-        log_filters.min_req_consequent_matches = match matches.opt_str("r").unwrap()
-        .to_string().parse::<usize>() {
-            Err(_) => panic!("Couldn't parse `columns` to UINT: {}",
-                matches.opt_str("r").unwrap()),
             Ok(value) => value,
         };
     }
