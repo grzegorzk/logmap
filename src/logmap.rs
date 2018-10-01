@@ -74,16 +74,10 @@ impl LogFilters {
     pub fn to_string(&self) -> String {
         let mut filters_string : String = String::new();
         for filter in &self.filters {
-            for word_alternatives in filter {
-                filters_string += "[";
-                for word in word_alternatives {
-                    filters_string += &word;
-                    filters_string += ",";
-                }
-                filters_string.pop();
-                filters_string += "],";
-            }
-            filters_string.pop();
+            // Vec<Vec<String>> -> Vec<String>
+            let word_alternatives: Vec<String> = filter.iter()
+                .map(|s| "[".to_string() + &s.join(",") + "]").collect();
+            filters_string += &word_alternatives.join(",");
             filters_string += ",\n";
         }
         filters_string.pop();
@@ -396,6 +390,7 @@ impl LogFilters {
         return -1;
     }
 
+    // TODO: decompose below into smaller and simpler methods
     fn _update_filter(&mut self, words: Vec<String>, filter_index: usize) {
         let mut indexes = self._normalise_lengths_before_first_match(&words, filter_index, 0, 0);
         while indexes.0 >= 0 && indexes.1 >= 0 && words.len() - 1 >= indexes.0 as usize {
@@ -410,19 +405,37 @@ impl LogFilters {
                 if indexes.0 == words.len() as isize - 1 {
                     break;
                 }
+                if indexes.1 == self.filters.get(filter_index).unwrap().len() as isize - 1 {
+                    break;
+                }
                 indexes.0 += 1;
                 indexes.1 += 1;
             }
         }
-        if indexes.0 >= 0 && indexes.1 >= 0 && indexes.0 <= words.len() as isize - 1 {
-            let mut reversed_words = words.clone();
-            reversed_words.reverse();
-            self.filters.get_mut(filter_index).unwrap().reverse();
-            self._normalise_lengths_before_first_match(&reversed_words, filter_index, 0, 0);
-            self.filters.get_mut(filter_index).unwrap().reverse();
+        if indexes.0 >= 0 && indexes.1 >= 0 {
+            let filter_length = {
+                self.filters.get(filter_index).unwrap().len()
+            };
+            if words.len() > filter_length && indexes.1 == filter_length as isize - 1 {
+                for extra_word in 0..words.len() - filter_length {
+                    {
+                        let mut filter = self.filters.get_mut(filter_index).unwrap();
+                        filter.push(vec![words[filter_length + extra_word].clone(), self.denote_optional.clone()]);
+                    }
+                    self._update_hash(&words[filter_length + extra_word].clone(), filter_index);
+                }
+            }
+            else if indexes.0 <= words.len() as isize - 1 {
+                let mut reversed_words = words.clone();
+                reversed_words.reverse();
+                self.filters.get_mut(filter_index).unwrap().reverse();
+                self._normalise_lengths_before_first_match(&reversed_words, filter_index, 0, 0);
+                self.filters.get_mut(filter_index).unwrap().reverse();
+            }
         }
     }
 
+    // TODO: decompose below into smaller and simpler methods
     fn _normalise_lengths_before_first_match(&mut self, words: &Vec<String>, filter_index: usize, word_start_index: usize, filter_start_index: usize) -> (isize, isize) {
         // returns first index after normalised filter slice
         let (first_word, first_filter) = self._get_indexes_of_earliest_matching_word(&words, filter_index, word_start_index, filter_start_index);

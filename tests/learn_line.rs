@@ -105,3 +105,48 @@ fn one_alt_no_nums_one_col_skipped_followed_by_long_line() {
 
     assert_eq!(log_filters.to_string(), expected);
 }
+
+#[test]
+fn one_alt_no_nums_one_col_skipped_repeated_filter_word_at_the_log_end() {
+    // Test without duplicate at the end
+    let mut log_filters = logmap::logmap::LogFilters::new();
+    log_filters.max_allowed_new_alternatives = 1;
+    log_filters.ignore_numeric_words = true;
+    log_filters.ignore_first_columns = 1;
+
+    log_filters.learn_line("Sep 22 22:27:52 some_hostname dolphin[7229]: org.kde.dolphin: slotUrlSelectionRequested:  QUrl(\"file:///some/path/dir1\")");
+    log_filters.learn_line("Sep 22 22:28:40 some_hostname dolphin[7229]: org.kde.dolphin: slotUrlSelectionRequested:  QUrl(\"file:///some/path/dir2\")");
+    log_filters.learn_line("Sep 22 22:32:22 some_hostname dolphin[7229]: org.kde.dolphin: slotUrlSelectionRequested:  QUrl(\"file:///some/path/dir2/dir3\")");
+
+    let expected: String = "[some_hostname],[dolphin],[org],[kde],[dolphin],[slotUrlSelectionRequested],[QUrl],[file],[some],[path],[dir1,dir2],[dir3,.]".to_string();
+
+    assert_eq!(log_filters.to_string(), expected);
+
+    // Test with duplicate at the end
+    let mut log_filters = logmap::logmap::LogFilters::new();
+    log_filters.max_allowed_new_alternatives = 1;
+    log_filters.ignore_numeric_words = true;
+    log_filters.ignore_first_columns = 1;
+
+    log_filters.learn_line("Sep 22 22:27:52 some_hostname dolphin[7229]: org.kde.dolphin: slotUrlSelectionRequested:  QUrl(\"file:///some/path/dir1\")");
+    log_filters.learn_line("Sep 22 22:28:40 some_hostname dolphin[7229]: org.kde.dolphin: slotUrlSelectionRequested:  QUrl(\"file:///some/path/dir2\")");
+    log_filters.learn_line("Sep 22 22:32:22 some_hostname dolphin[7229]: org.kde.dolphin: slotUrlSelectionRequested:  QUrl(\"file:///some/path/dir2/dir1\")");
+
+    let expected: String = "[some_hostname],[dolphin],[org],[kde],[dolphin],[slotUrlSelectionRequested],[QUrl],[file],[some],[path],[dir1,dir2],[dir1,.]".to_string();
+
+    assert_eq!(log_filters.to_string(), expected);
+
+    // Test with two duplicates at the end
+    let mut log_filters = logmap::logmap::LogFilters::new();
+    log_filters.max_allowed_new_alternatives = 2;
+    log_filters.ignore_numeric_words = true;
+    log_filters.ignore_first_columns = 1;
+
+    log_filters.learn_line("Sep 22 22:27:52 some_hostname dolphin[7229]: org.kde.dolphin: slotUrlSelectionRequested:  QUrl(\"file:///some/path/dir1\")");
+    log_filters.learn_line("Sep 22 22:28:40 some_hostname dolphin[7229]: org.kde.dolphin: slotUrlSelectionRequested:  QUrl(\"file:///some/path/dir2\")");
+    log_filters.learn_line("Sep 22 22:32:22 some_hostname dolphin[7229]: org.kde.dolphin: slotUrlSelectionRequested:  QUrl(\"file:///some/path/dir2/dir1/dir1\")");
+
+    let expected: String = "[some_hostname],[dolphin],[org],[kde],[dolphin],[slotUrlSelectionRequested],[QUrl],[file],[some],[path],[dir1,dir2],[dir1,.],[dir1,.]".to_string();
+
+    assert_eq!(log_filters.to_string(), expected);
+}
