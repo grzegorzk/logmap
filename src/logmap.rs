@@ -108,35 +108,35 @@ impl LogFilters {
     }
 
     fn _load_parameters(log_filters_lines: &Vec<&str>) -> Self {
-        if log_filters_lines.len() < 6 {
-            panic!("File is corrupted! At least 6 lines expected, found {}",
+        if log_filters_lines.len() < 5 {
+            panic!("File is corrupted! At least 5 lines expected, found {}",
             log_filters_lines.len())
         }
 
-        let max_allowed_new_alternatives: usize = match log_filters_lines[1]
+        let max_allowed_new_alternatives: usize = match log_filters_lines[0]
         .to_string().parse::<usize>() {
-            Err(why) => panic!("Couldn't parse 2nd line of input to `usize`: {}, {}",
-                log_filters_lines[1], why.description()),
+            Err(why) => panic!("Couldn't parse 1st line of input to `usize`: {}, {}",
+                log_filters_lines[0], why.description()),
             Ok(value) => value,
         };
 
         let denote_optional: String;
-        denote_optional = log_filters_lines[2].to_string();
+        denote_optional = log_filters_lines[1].to_string();
         if denote_optional.len() == 0 {
-            panic!("3rd line of input cannot be empty!");
+            panic!("2nd line of input cannot be empty!");
         }
 
-        let ignore_numeric_words: bool = match log_filters_lines[3]
+        let ignore_numeric_words: bool = match log_filters_lines[2]
         .to_string().parse::<bool>() {
-            Err(why) => panic!("Couldn't parse 4th line of input to `bool`: {}, {}",
-                log_filters_lines[3], why.description()),
+            Err(why) => panic!("Couldn't parse 3rd line of input to `bool`: {}, {}",
+                log_filters_lines[2], why.description()),
             Ok(value) => value,
         };
 
-        let ignore_first_columns: usize = match log_filters_lines[4]
+        let ignore_first_columns: usize = match log_filters_lines[3]
         .to_string().parse::<usize>() {
-            Err(why) => panic!("Couldn't parse 5th line of input to `usize`: {}, {}",
-                log_filters_lines[4], why.description()),
+            Err(why) => panic!("Couldn't parse 4th line of input to `usize`: {}, {}",
+                log_filters_lines[3], why.description()),
             Ok(value) => value,
         };
 
@@ -200,6 +200,9 @@ impl LogFilters {
     }
 
     pub fn is_line_known(&mut self, log_line: &str) -> bool {
+        // TODO: handle situation where filter was consequently made longer
+        //       by incoming log lines so that when trying to analyze first (shorter)
+        //       log lines they are not recognized (even though should be)
         let words = self._line_to_words(&log_line);
         if self._find_best_matching_filter_index(&words) == -1 {
             return false;
@@ -748,7 +751,7 @@ mod tests {
     #[test]
     fn _load_parameters() {
         // TODO: cover incorrect input
-        let log_filters_lines = vec!["3", "2", ".", "true", "2", "0"];
+        let log_filters_lines = vec!["2", ".", "true", "2", "0"];
         let log_filters = LogFilters::_load_parameters(&log_filters_lines);
         assert_eq!(log_filters.max_allowed_new_alternatives, 2);
         assert_eq!(log_filters.denote_optional, ".");
