@@ -274,7 +274,7 @@ impl LogFilters {
             }
         }
         if max_consequent_matches as isize >= words.len() as isize - self.max_allowed_new_alternatives as isize {
-            if max_consequent_matches_indexes.len() >= 1 {
+            if max_consequent_matches_indexes.len() > 1 {
                 let mut matching_filters : String = String::new();
                 for filter_index in max_consequent_matches_indexes {
                     matching_filters += &format!("{:?}, ", self.filters.get(filter_index).unwrap());
