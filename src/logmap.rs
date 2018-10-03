@@ -194,9 +194,6 @@ impl LogFilters {
     }
 
     pub fn is_line_known(&mut self, log_line: &str) -> bool {
-        // TODO: handle situation where filter was consequently made longer
-        //       by incoming log lines so that when trying to analyze first (shorter)
-        //       log lines they are not recognized (even though should be)
         let words = self._line_to_words(&log_line);
         if self._find_best_matching_filter_index(&words) == -1 {
             return false;
@@ -264,24 +261,37 @@ impl LogFilters {
 
         let mut best_matching_filter_index : isize = -1;
         let mut max_consequent_matches : usize = 0;
+        let mut max_consequent_matches_indexes: Vec<usize> = Vec::new();
         for filter_index in self._get_filter_indexes_with_min_req_matches(words) {
             let max_cur_consequent_matches = self._count_consequent_matches(words, filter_index);
             if max_cur_consequent_matches > max_consequent_matches {
                 max_consequent_matches = max_cur_consequent_matches;
                 best_matching_filter_index = filter_index as isize;
+                max_consequent_matches_indexes = Vec::new();
+            }
+            else if max_cur_consequent_matches == max_consequent_matches {
+                max_consequent_matches_indexes.push(filter_index);
             }
         }
-        // TODO: add warning if more than one line was found with same max_consequent_matches
         if max_consequent_matches as isize >= words.len() as isize - self.max_allowed_new_alternatives as isize {
+            if max_consequent_matches_indexes.len() >= 1 {
+                let mut matching_filters : String = String::new();
+                for filter_index in max_consequent_matches_indexes {
+                    matching_filters += &format!("{:?}, ", self.filters.get(filter_index).unwrap());
+                }
+                eprintln!("More than one matching filter found. Words: {:?}; Filters: {}", &words, &matching_filters);
+            }
             return best_matching_filter_index;
         }
         return -1;
     }
 
+    // TODO: decompose below into smaller and simpler methods
     fn _get_filter_indexes_with_min_req_matches(&self, words: &Vec<String>) -> Vec<usize> {
         let mut filter_indexes_with_min_req_matches: Vec<usize> = Vec::new();
         let filters_with_words = self._get_sorted_filter_indexes_containing_words(words);
         let mut matches : usize = 0;
+        let mut optional_alternatives : usize = 0;
         let mut prev_index : isize = -1;
         let mut last_inserted_index : isize = -1;
         for filter_index in filters_with_words {
@@ -291,13 +301,19 @@ impl LogFilters {
             if prev_index != filter_index as isize {
                 matches = 1;
                 prev_index = filter_index as isize;
+                optional_alternatives = 0;
+                for word_alternatives in self.filters.get(filter_index).unwrap() {
+                    if word_alternatives.contains(&self.denote_optional) {
+                        optional_alternatives += 1;
+                    }
+                }
             }
             else {
                 matches = matches + 1;
             }
 
             if matches as isize >= words.len() as isize - self.max_allowed_new_alternatives as isize
-            && matches as isize >= self.filters[filter_index].len() as isize - self.max_allowed_new_alternatives as isize {
+            && matches as isize >= self.filters[filter_index].len() as isize - self.max_allowed_new_alternatives as isize - optional_alternatives as isize {
                 matches = 0;
                 filter_indexes_with_min_req_matches.push(filter_index);
                 last_inserted_index = filter_index as isize;
@@ -934,6 +950,32 @@ mod tests {
         log_filters.max_allowed_new_alternatives = 3;
         let words = tst_utils::_words_vector_from_string("bbb aaa");
         assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        // Test situation where there are more optional alternatives than max_allowed_new_alternatives
+        let mut log_filters = LogFilters::new();
+        log_filters.max_allowed_new_alternatives = 0;
+        let mut complex_filter = tst_utils::_simple_filter_from_string("eee fff ggg hhh iii jjj kkk lll");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 4, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 5, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 6, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 7, ".");
+        tst_utils::_add_test_filter(&mut log_filters, complex_filter);
+        let words = tst_utils::_words_vector_from_string("eee fff ggg hhh");
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), 0);
+        // Test situation where there are only optional alternatives
+        let mut log_filters = LogFilters::new();
+        log_filters.max_allowed_new_alternatives = 0;
+        let mut complex_filter = tst_utils::_simple_filter_from_string("eee fff ggg hhh iii jjj kkk lll");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 0, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 1, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 2, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 3, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 4, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 5, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 6, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 7, ".");
+        tst_utils::_add_test_filter(&mut log_filters, complex_filter);
+        let words = tst_utils::_words_vector_from_string("mmm nnn ooo ppp");
+        assert_eq!(log_filters._find_best_matching_filter_index(&words), -1);
 
         // TODO: more unit-tests to cover edge cases for max_allowed_new_alternatives
     }
@@ -1009,6 +1051,32 @@ mod tests {
         log_filters.max_allowed_new_alternatives = 3;
         let words = tst_utils::_words_vector_from_string("ddd lll zzz yyy aaa");
         assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0]);
+        // Test situation where there are more optional alternatives than max_allowed_new_alternatives
+        let mut log_filters = LogFilters::new();
+        log_filters.max_allowed_new_alternatives = 0;
+        let mut complex_filter = tst_utils::_simple_filter_from_string("eee fff ggg hhh iii jjj kkk lll");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 4, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 5, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 6, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 7, ".");
+        tst_utils::_add_test_filter(&mut log_filters, complex_filter);
+        let words = tst_utils::_words_vector_from_string("eee fff ggg hhh");
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![0]);
+        // Test situation where there are only optional alternatives
+        let mut log_filters = LogFilters::new();
+        log_filters.max_allowed_new_alternatives = 0;
+        let mut complex_filter = tst_utils::_simple_filter_from_string("eee fff ggg hhh iii jjj kkk lll");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 0, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 1, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 2, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 3, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 4, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 5, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 6, ".");
+        complex_filter = tst_utils::_add_word_alternative(complex_filter, 7, ".");
+        tst_utils::_add_test_filter(&mut log_filters, complex_filter);
+        let words = tst_utils::_words_vector_from_string("mmm nnn ooo ppp");
+        assert_eq!(log_filters._get_filter_indexes_with_min_req_matches(&words), vec![]);
 
         // TODO: more unit-tests to cover edge cases for max_allowed_new_alternatives
     }
