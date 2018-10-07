@@ -37,6 +37,24 @@ fn no_alts_no_nums_no_cols_skipped() {
 }
 
 #[test]
+fn no_alts_no_nums_extended_no_cols_skipped() {
+    let mut log_filters = logmap::logmap::LogFilters::new();
+    log_filters.max_allowed_new_alternatives = 0;
+    log_filters.ignore_numeric_words = true;
+    log_filters.ignore_first_columns = 0;
+
+    log_filters.learn_line(&("Dec 18 09:59:36 host_name [error] 19901#19901: *180073 open() \"/path/to/file\"".to_string() +
+        "failed (2: No such file or directory), client: 127.0.0.1, server: some.example.com, request:" +
+        "\"GET /request/url HTTP/1.1\", host: \"some.example.com\""));
+
+    let expected: String = "[Dec],[host_name],[error],[open],[path],[to],[file]".to_string() +
+        ",[failed],[No],[such],[file],[or],[directory],[client],[server],[some],[example],[com],[request]" +
+        ",[GET],[request],[url],[HTTP],[host],[some],[example],[com]";
+
+    assert_eq!(log_filters.to_string(), expected);
+}
+
+#[test]
 fn no_alts_no_nums_one_col_skipped() {
     let mut log_filters = logmap::logmap::LogFilters::new();
     log_filters.max_allowed_new_alternatives = 0;

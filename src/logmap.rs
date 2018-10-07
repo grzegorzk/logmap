@@ -250,7 +250,7 @@ impl LogFilters {
     }
 
     fn _is_word_only_numeric(&self, word: &String) -> bool {
-        let chars_are_numeric: Vec<bool> = word.chars().map(|c|c.is_numeric()).collect();
+        let chars_are_numeric: Vec<bool> = word.chars().map(|c|c=='*' || c=='#' || c.is_numeric()).collect();
         return !chars_are_numeric.contains(&false);
     }
 
@@ -875,6 +875,10 @@ mod tests {
         assert_eq!(log_filters._is_word_only_numeric(&"123a".to_string()), false);
         assert_eq!(log_filters._is_word_only_numeric(&"a123".to_string()), false);
         assert_eq!(log_filters._is_word_only_numeric(&"6789".to_string()), true);
+        assert_eq!(log_filters._is_word_only_numeric(&"*6789".to_string()), true);
+        assert_eq!(log_filters._is_word_only_numeric(&"#6789".to_string()), true);
+        assert_eq!(log_filters._is_word_only_numeric(&"6789*6789".to_string()), true);
+        assert_eq!(log_filters._is_word_only_numeric(&"6789#6789".to_string()), true);
         assert_eq!(log_filters._is_word_only_numeric(&"".to_string()), true);
     }
 
