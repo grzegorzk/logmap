@@ -1,11 +1,10 @@
-#![allow(dead_code)]
-
 use std::error::Error;
 use std::io::prelude::*;
 use std::fs::File;
 use std::path::Path;
 use std::collections::HashMap;
 
+#[derive(Default)]
 pub struct LogFilters {
     /// Each `filters` element stores a vector of individual words variations
     /// filters (Vec) - collection of all log lines
@@ -36,8 +35,8 @@ impl LogFilters {
         let words_hash = HashMap::new();
 
         LogFilters {
-            filters: filters,
-            words_hash: words_hash,
+            filters,
+            words_hash,
             max_allowed_new_alternatives: 0,
             // below must never land as word alternative
             denote_optional: ".".to_string(),
@@ -82,7 +81,8 @@ impl LogFilters {
         }
         filters_string.pop();
         filters_string.pop();
-        return filters_string;
+
+        filters_string
     }
 
     pub fn load(path: &Path) -> Self {
@@ -98,10 +98,10 @@ impl LogFilters {
         let mut log_filters = LogFilters::_load_parameters(&log_filters_lines);
         log_filters._from_str_lines(&log_filters_lines);
 
-        return log_filters;
+        log_filters
     }
 
-    fn _load_parameters(log_filters_lines: &Vec<&str>) -> Self {
+    fn _load_parameters(log_filters_lines: &[&str]) -> Self {
         if log_filters_lines.len() < 5 {
             panic!("File is corrupted! At least 5 lines expected, found {}",
             log_filters_lines.len())
@@ -116,7 +116,7 @@ impl LogFilters {
 
         let denote_optional: String;
         denote_optional = log_filters_lines[1].to_string();
-        if denote_optional.len() == 0 {
+        if denote_optional.is_empty() {
             panic!("2nd line of input cannot be empty!");
         }
 
@@ -137,32 +137,32 @@ impl LogFilters {
         LogFilters {
             filters: Vec::new(),
             words_hash: HashMap::new(),
-            max_allowed_new_alternatives: max_allowed_new_alternatives,
-            denote_optional: denote_optional,
-            ignore_numeric_words: ignore_numeric_words,
-            ignore_first_columns: ignore_first_columns
+            max_allowed_new_alternatives,
+            denote_optional,
+            ignore_numeric_words,
+            ignore_first_columns
         }
     }
 
-    fn _from_str_lines(&mut self, log_filters_lines: &Vec<&str>) {
+    fn _from_str_lines(&mut self, log_filters_lines: &[&str]) {
         for line in log_filters_lines {
-            if !line.contains("[") || !line.contains("]") {
+            if !line.contains('[') || !line.contains(']') {
                 continue;
             }
             let mut alternatives = Vec::new();
             let mut include_in_hash = Vec::new();
             let alts_iter = line.split(|c| c == '[' || c == ']')
-                .map(|s| s.to_string()).filter(|s| s.len() > 0 && s != ",");
+                .map(|s| s.to_string()).filter(|s| !s.is_empty() && s != ",");
             for alternative in alts_iter {
-                let words: Vec<String> = alternative.split(",")
-                    .map(|s| s.to_string()).filter(|s| s.len() > 0).collect();
+                let words: Vec<String> = alternative.split(',')
+                    .map(|s| s.to_string()).filter(|s| !s.is_empty()).collect();
                 include_in_hash.extend(words.clone());
                 alternatives.push(words);
             }
             self.filters.push(alternatives);
             let last_filter_index = self.filters.len() - 1;
             for word in include_in_hash {
-                if word.len() == 0 || word == self.denote_optional {
+                if word.is_empty() || word == self.denote_optional {
                     continue;
                 }
                 self._update_hash(&word, last_filter_index)
@@ -171,7 +171,7 @@ impl LogFilters {
     }
 
     pub fn print(&self) {
-        if self.filters.len() > 0 {
+        if !self.filters.is_empty() {
             for elem in &self.filters {
                 println!("{:?}", elem);
             }
@@ -180,7 +180,7 @@ impl LogFilters {
             println!("No filters added yet");
         }
         println!();
-        if self.words_hash.len() > 0 {
+        if !self.words_hash.is_empty() {
             let keys: &Vec<&String> = &self.words_hash.keys().collect();
             let mut keys = keys.clone();
             keys.sort();
@@ -193,12 +193,13 @@ impl LogFilters {
         }
     }
 
-    pub fn is_line_known(&mut self, log_line: &str) -> bool {
+    pub fn is_line_known(&self, log_line: &str) -> bool {
         let words = self._line_to_words(&log_line);
         if self._find_best_matching_filter_index(&words) == -1 {
             return false;
         }
-        return true;
+
+        true
     }
 
     fn _line_to_words(&self, log_line: &str) -> Vec<String> {
@@ -217,7 +218,8 @@ impl LogFilters {
             }
             words.push(word);
         }
-        return words;
+
+        words
     }
 
     pub fn _line_split(log_line: &str) -> Vec<String> {
@@ -234,7 +236,7 @@ impl LogFilters {
             c == '{' ||
             c == '}' ||
             c == '[' ||
-            c == ']').map(|s| s.to_string()).filter(|s| s.len() > 0).collect()
+            c == ']').map(|s| s.to_string()).filter(|s| !s.is_empty()).collect()
     }
 
     pub fn learn_line(&mut self, log_line: &str) {
@@ -242,20 +244,21 @@ impl LogFilters {
 
         let matched_filter_index = self._find_best_matching_filter_index(&words);
         if matched_filter_index >= 0 {
-            self._update_filter(words, matched_filter_index as usize);
+            self._update_filter(&words, matched_filter_index as usize);
         }
         else {
             self._add_filter(words);
         }
     }
 
-    fn _is_word_only_numeric(&self, word: &String) -> bool {
+    fn _is_word_only_numeric(&self, word: &str) -> bool {
         let chars_are_numeric: Vec<bool> = word.chars().map(|c|c=='*' || c=='#' || c.is_numeric()).collect();
-        return !chars_are_numeric.contains(&false);
+
+        !chars_are_numeric.contains(&false)
     }
 
-    fn _find_best_matching_filter_index(&self, words: &Vec<String>) -> isize {
-        if self.filters.len() == 0 || words.len() == 0 {
+    fn _find_best_matching_filter_index(&self, words: &[String]) -> isize {
+        if self.filters.is_empty() || words.is_empty() {
             return -1
         }
 
@@ -277,17 +280,18 @@ impl LogFilters {
             if max_consequent_matches_indexes.len() > 1 {
                 let mut matching_filters : String = String::new();
                 for filter_index in max_consequent_matches_indexes {
-                    matching_filters += &format!("{:?}, ", self.filters.get(filter_index).unwrap());
+                    matching_filters += &format!("{:?}, ", self.filters[filter_index]);
                 }
                 eprintln!("More than one matching filter found. Words: {:?}; Filters: {}", &words, &matching_filters);
             }
             return best_matching_filter_index;
         }
-        return -1;
+
+        -1
     }
 
     // TODO: decompose below into smaller and simpler methods
-    fn _get_filter_indexes_with_min_req_matches(&self, words: &Vec<String>) -> Vec<usize> {
+    fn _get_filter_indexes_with_min_req_matches(&self, words: &[String]) -> Vec<usize> {
         let mut filter_indexes_with_min_req_matches: Vec<usize> = Vec::new();
         let filters_with_words = self._get_sorted_filter_indexes_containing_words(words);
         let mut matches : usize = 0;
@@ -302,14 +306,14 @@ impl LogFilters {
                 matches = 1;
                 prev_index = filter_index as isize;
                 optional_alternatives = 0;
-                for word_alternatives in self.filters.get(filter_index).unwrap() {
+                for word_alternatives in &self.filters[filter_index] {
                     if word_alternatives.contains(&self.denote_optional) {
                         optional_alternatives += 1;
                     }
                 }
             }
             else {
-                matches = matches + 1;
+                matches += 1;
             }
 
             if matches as isize >= words.len() as isize - self.max_allowed_new_alternatives as isize
@@ -319,23 +323,25 @@ impl LogFilters {
                 last_inserted_index = filter_index as isize;
             }
         }
-        return filter_indexes_with_min_req_matches;
+
+        filter_indexes_with_min_req_matches
     }
 
-    fn _get_sorted_filter_indexes_containing_words(&self, words: &Vec<String>) -> Vec<usize> {
+    fn _get_sorted_filter_indexes_containing_words(&self, words: &[String]) -> Vec<usize> {
         let mut filters_with_words: Vec<usize> = Vec::new();
         for word in words {
             if self.words_hash.get(word).is_some() {
-                let vector_indexes = self.words_hash.get(word).unwrap();
+                let vector_indexes = &self.words_hash[word];
                 filters_with_words.extend(vector_indexes);
             }
         }
         filters_with_words.sort();
-        return filters_with_words;
+
+        filters_with_words
     }
 
-    fn _count_consequent_matches(&self, words: &Vec<String>, filter_index: usize) -> usize {
-        if self.filters.len() <= filter_index || words.len() == 0 {
+    fn _count_consequent_matches(&self, words: &[String], filter_index: usize) -> usize {
+        if self.filters.len() <= filter_index || words.is_empty() {
             return 0;
         }
         let mut consequent_matches : usize = 0;
@@ -343,7 +349,7 @@ impl LogFilters {
         let mut new_alternatives : usize = 0;
 
         let mut extra_allowed_new_alternatives : usize = 0;
-        let filter_length = self.filters.get(filter_index).unwrap().len();
+        let filter_length = self.filters[filter_index].len();
         if filter_length < words.len() {
             extra_allowed_new_alternatives = words.len() - filter_length;
         }
@@ -365,17 +371,18 @@ impl LogFilters {
                 }
             }
         }
-        return max_consequent_matches;
+
+        max_consequent_matches
     }
 
-    fn _get_word_index_in_filter(&self, word: &String, filter_index: usize, start_from_word: usize) -> isize {
-        if word.len() == 0 {
+    fn _get_word_index_in_filter(&self, word: &str, filter_index: usize, start_from_word: usize) -> isize {
+        if word.is_empty() {
             return -1;
         }
         if self.words_hash.get(word).is_none() {
             return -1;
         }
-        if !self.words_hash.get(word).unwrap().contains(&filter_index) {
+        if !&self.words_hash[word].contains(&filter_index) {
             return -1;
         }
         let filter = self.filters.get(filter_index);
@@ -383,33 +390,35 @@ impl LogFilters {
             return -1;
         }
         let filter = filter.unwrap();
-        if filter.len() == 0 || filter.len() - 1 < start_from_word {
+        if filter.is_empty() || filter.len() - 1 < start_from_word {
             return -1;
         }
 
-        for word_alternative_index in start_from_word..filter.len() {
-            if filter.get(word_alternative_index).unwrap().contains(word) {
+        for (word_alternative_index, word_alternative) in filter.iter().enumerate().skip(start_from_word) {
+            if word_alternative.contains(&word.to_owned()) {
                 return word_alternative_index as isize;
             }
         }
-        return -1;
+
+        -1
     }
 
-    fn _get_word_index_in_words(&self, word: &String, words: &Vec<String>) -> isize {
-        if words.len() == 0 || word.len() == 0 {
+    fn _get_word_index_in_words(&self, word: &str, words: &[String]) -> isize {
+        if words.is_empty() || word.is_empty() {
             return -1;
         }
         let word_index_option = words.iter().position(|r| r == word);
         if word_index_option.is_some() {
             return word_index_option.unwrap() as isize;
         }
-        return -1;
+
+        -1
     }
 
     // TODO: decompose below into smaller and simpler methods
-    fn _update_filter(&mut self, words: Vec<String>, filter_index: usize) {
+    fn _update_filter(&mut self, words: &[String], filter_index: usize) {
         let mut indexes = self._normalise_lengths_before_first_match(&words, filter_index, 0, 0);
-        while indexes.0 >= 0 && indexes.1 >= 0 && words.len() - 1 >= indexes.0 as usize {
+        while indexes.0 >= 0 && indexes.1 >= 0 && words.len() > indexes.0 as usize {
             let new_indexes = self._normalise_lengths_before_first_match(&words, filter_index, indexes.0 as usize, indexes.1 as usize);
             if new_indexes.0 == -1 || new_indexes.1 == -1 {
                 break;
@@ -421,7 +430,7 @@ impl LogFilters {
                 if indexes.0 == words.len() as isize - 1 {
                     break;
                 }
-                if indexes.1 == self.filters.get(filter_index).unwrap().len() as isize - 1 {
+                if indexes.1 == self.filters[filter_index].len() as isize - 1 {
                     break;
                 }
                 indexes.0 += 1;
@@ -430,29 +439,29 @@ impl LogFilters {
         }
         if indexes.0 >= 0 && indexes.1 >= 0 {
             let filter_length = {
-                self.filters.get(filter_index).unwrap().len()
+                self.filters[filter_index].len()
             };
             if words.len() > filter_length && indexes.1 == filter_length as isize - 1 {
                 for extra_word in 0..words.len() - filter_length {
                     {
-                        let mut filter = self.filters.get_mut(filter_index).unwrap();
+                        let mut filter = &mut self.filters[filter_index];
                         filter.push(vec![words[filter_length + extra_word].clone(), self.denote_optional.clone()]);
                     }
                     self._update_hash(&words[filter_length + extra_word].clone(), filter_index);
                 }
             }
-            else if indexes.0 <= words.len() as isize - 1 {
-                let mut reversed_words = words.clone();
+            else if indexes.0 < words.len() as isize {
+                let mut reversed_words = words.to_owned();
                 reversed_words.reverse();
-                self.filters.get_mut(filter_index).unwrap().reverse();
+                self.filters[filter_index].reverse();
                 self._normalise_lengths_before_first_match(&reversed_words, filter_index, 0, 0);
-                self.filters.get_mut(filter_index).unwrap().reverse();
+                self.filters[filter_index].reverse();
             }
         }
     }
 
     // TODO: decompose below into smaller and simpler methods
-    fn _normalise_lengths_before_first_match(&mut self, words: &Vec<String>, filter_index: usize, word_start_index: usize, filter_start_index: usize) -> (isize, isize) {
+    fn _normalise_lengths_before_first_match(&mut self, words: &[String], filter_index: usize, word_start_index: usize, filter_start_index: usize) -> (isize, isize) {
         // returns first index after normalised filter slice
         let (first_word, first_filter) = self._get_indexes_of_earliest_matching_word(&words, filter_index, word_start_index, filter_start_index);
         if first_word < 0 || first_filter < 0 {
@@ -469,68 +478,62 @@ impl LogFilters {
             // TODO: check if below can be done in more elegant way
             {
                 let first_filter = first_filter as usize;
-                let filter = self.filters.get_mut(filter_index).unwrap();
+                let filter = &mut self.filters[filter_index];
                 filter.splice(first_filter..first_filter, front_words);
             }
             for word in &words[word_start_index..first_word as usize] {
                 self._update_hash(&word, filter_index);
             }
-            return (first_word, first_filter + updates);
+
+            (first_word, first_filter + updates)
         }
         else {
             {
                 // Mark first filter columns as optional alternatives
-                let filter = self.filters.get_mut(filter_index).unwrap();
-                for word_alternative_index in filter_start_index..(filter_start_index as isize + first_filter - first_word - filters_offset) as usize {
-                    let mut word_alternatives = filter.get_mut(word_alternative_index).unwrap();
+                let filter = &mut self.filters[filter_index];
+                for word_alternatives in filter.iter_mut().take((filter_start_index as isize + first_filter - first_word - filters_offset) as usize).skip(filter_start_index) {
                     if !word_alternatives.contains(&self.denote_optional) {
                         word_alternatives.push(self.denote_optional.clone());
                     }
                 }
                 // Add new alternatives if filter length before first match was longer than words index
                 let mut word_index : usize = word_start_index;
-                for word_alternative_index in (filter_start_index as isize + first_filter - first_word - filters_offset) as usize..first_filter as usize {
-                    let mut word_alternatives = filter.get_mut(word_alternative_index).unwrap();
-                    if !word_alternatives.contains(&words.get(word_index).unwrap()) {
-                        word_alternatives.push(words.get(word_index).unwrap().clone());
+                for word_alternatives in filter.iter_mut().take(first_filter as usize).skip((filter_start_index as isize + first_filter - first_word - filters_offset) as usize) {
+                    if !word_alternatives.contains(&words[word_index]) {
+                        word_alternatives.push(words[word_index].clone());
                     }
                     word_index += 1;
                 }
             }
-            for word_index in word_start_index..first_word as usize {
-                self._update_hash(words.get(word_index).unwrap(), filter_index);
+            for word in words.iter().take(first_word as usize).skip(word_start_index) {
+                self._update_hash(&word, filter_index);
             }
-            return (first_word, first_filter);
+
+            (first_word, first_filter)
         }
     }
 
-    fn _get_indexes_of_earliest_matching_word(&self, words: &Vec<String>, filter_index: usize, word_start_index: usize, filter_start_index: usize) -> (isize, isize) {
+    fn _get_indexes_of_earliest_matching_word(&self, words: &[String], filter_index: usize, word_start_index: usize, filter_start_index: usize) -> (isize, isize) {
         if words.len() as isize - 1 < word_start_index as isize || self.filters.get(filter_index).is_none() {
             return (-1, -1);
         }
-        if self.filters.get(filter_index).unwrap().len() as isize - 1 < filter_start_index as isize {
+        if self.filters[filter_index].len() as isize - 1 < filter_start_index as isize {
             return (-1, -1);
         }
 
         let filters_offset = filter_start_index as isize - word_start_index as isize;
         let mut first_matching_word : isize = -1;
         let mut first_matching_filter : isize = -1;
-        for word_index in word_start_index..words.len() {
-            let word = words.get(word_index).unwrap();
-            let matching_filter_index = self._get_word_index_in_filter(word, filter_index, (word_start_index as isize + filters_offset) as usize);
-            if  matching_filter_index >= 0 {
-                if first_matching_filter == -1 {
-                    first_matching_filter = matching_filter_index;
-                    first_matching_word = word_index as isize;
-                }
-                else if matching_filter_index < first_matching_filter {
-                    first_matching_filter = matching_filter_index;
-                    first_matching_word = word_index as isize;
-                }
+        for (word_index, word) in words.iter().enumerate().skip(word_start_index) {
+            let matching_filter_index = self._get_word_index_in_filter(&word, filter_index, (word_start_index as isize + filters_offset) as usize);
+            if  matching_filter_index >= 0
+            && (first_matching_filter == -1 || matching_filter_index < first_matching_filter) {
+                first_matching_filter = matching_filter_index;
+                first_matching_word = word_index as isize;
             }
         }
 
-        return (first_matching_word, first_matching_filter);
+        (first_matching_word, first_matching_filter)
     }
 
     fn _add_filter(&mut self, words: Vec<String>) {
@@ -538,11 +541,11 @@ impl LogFilters {
         let expected_index : usize = self.filters.len();
 
         for word in words {
-            if word.len() > 0 {
+            if !word.is_empty() {
                 new_filter.push(vec![word]);
             }
         }
-        if new_filter.len() > 0 {
+        if !new_filter.is_empty() {
             self.filters.push(new_filter.clone());
             for word_alternatives in new_filter {
                 self._update_hash(&word_alternatives[0], expected_index);
@@ -550,9 +553,9 @@ impl LogFilters {
         }
     }
 
-    fn _update_hash(&mut self, word: &String, filter_index: usize) {
+    fn _update_hash(&mut self, word: &str, filter_index: usize) {
         if self._is_word_in_filter(word, filter_index) {
-            self.words_hash.entry(word.clone()).or_insert(vec![filter_index]);
+            self.words_hash.entry(word.to_owned()).or_insert(vec![filter_index]);
             let vector_indexes = self.words_hash.get_mut(word).unwrap();
             if !vector_indexes.contains(&filter_index) {
                 vector_indexes.push(filter_index);
@@ -561,7 +564,7 @@ impl LogFilters {
         }
     }
 
-    fn _is_word_in_filter(&self, word: &String, filter_index: usize) -> bool {
+    fn _is_word_in_filter(&self, word: &str, filter_index: usize) -> bool {
         let filter = self.filters.get(filter_index);
         if filter.is_none() {
             return false;
@@ -569,11 +572,12 @@ impl LogFilters {
         
         let filter = filter.unwrap();
         for word_alternatives in filter {
-            if word_alternatives.contains(word) {
+            if word_alternatives.contains(&word.to_owned()) {
                 return true;
             }
         }
-        return false;
+
+        false
     }
 }
 
@@ -1207,7 +1211,7 @@ mod tests {
     fn _update_filter() {
         // Test empty data structure
         let mut log_filters = LogFilters::new();
-        log_filters._update_filter(vec![], 0);
+        log_filters._update_filter(&vec![], 0);
         assert_eq!(log_filters.filters.len(), 0);
 
         let mut log_filters = tst_utils::_init_test_data();
@@ -1215,21 +1219,21 @@ mod tests {
         log_filters.denote_optional = ".".to_string();
         // Try to update based on empty words vector
         let filter_0_len = log_filters.filters[0].len();
-        log_filters._update_filter(vec![], 0);
+        log_filters._update_filter(&vec![], 0);
         assert_eq!(log_filters.filters[0].len(), filter_0_len);
         // Try to update a filter that does not exist
         let words = tst_utils::_words_vector_from_string("aaa bbb ccc xxx");
         let nonexisting_filter_index = log_filters.filters.len();
-        log_filters._update_filter(words, nonexisting_filter_index);
+        log_filters._update_filter(&words, nonexisting_filter_index);
         // No update required
         let words = tst_utils::_words_vector_from_string("mmm nnn ooo ppp");
-        log_filters._update_filter(words, 3);
+        log_filters._update_filter(&words, 3);
         let expected = tst_utils::_simple_filter_from_string("mmm nnn ooo ppp");
         assert_eq!(log_filters.filters.get(3).unwrap(), &expected);
 
         // One new (hence optional) word alternative added at the front of filter
         let words = tst_utils::_words_vector_from_string("foo qqq rrr sss ttt");
-        log_filters._update_filter(words, 4);
+        log_filters._update_filter(&words, 4);
         let mut expected = tst_utils::_simple_filter_from_string("foo qqq rrr sss ttt");
         expected = tst_utils::_add_word_alternative(expected, 0, ".");
         expected = tst_utils::_add_word_alternative(expected, 4, "aaa");
@@ -1237,7 +1241,7 @@ mod tests {
         assert_eq!(log_filters.words_hash.get(&"foo".to_string()).unwrap(), &vec![4]);
         // Two new (hence optional) word alternatives added at the front of filter
         let words = tst_utils::_words_vector_from_string("xyz qwe mmm nnn ooo ppp");
-        log_filters._update_filter(words, 3);
+        log_filters._update_filter(&words, 3);
         let mut expected = tst_utils::_simple_filter_from_string("xyz qwe mmm nnn ooo ppp");
         expected = tst_utils::_add_word_alternative(expected, 0, ".");
         expected = tst_utils::_add_word_alternative(expected, 1, ".");
@@ -1246,20 +1250,20 @@ mod tests {
         assert_eq!(log_filters.words_hash.get(&"qwe".to_string()).unwrap(), &vec![3]);
         // One word turned to (optional) alternative as a result of words vector shorter than filter
         let words = tst_utils::_words_vector_from_string("fff ggg hhh x y z");
-        log_filters._update_filter(words, 1);
+        log_filters._update_filter(&words, 1);
         let mut expected = tst_utils::_simple_filter_from_string("eee fff ggg hhh x y z");
         expected = tst_utils::_add_word_alternative(expected, 0, ".");
         assert_eq!(log_filters.filters.get(1).unwrap(), &expected);
         // Two words turned to (optional) alternatives as a result of words vector shorter than filter
         let words = tst_utils::_words_vector_from_string("kkk lll");
-        log_filters._update_filter(words, 2);
+        log_filters._update_filter(&words, 2);
         let mut expected = tst_utils::_simple_filter_from_string("iii jjj kkk lll");
         expected = tst_utils::_add_word_alternative(expected, 0, ".");
         expected = tst_utils::_add_word_alternative(expected, 1, ".");
         assert_eq!(log_filters.filters.get(2).unwrap(), &expected);
         // One word turned to optional alternative and one new alternative added
         let words = tst_utils::_words_vector_from_string("bar ccc sss");
-        log_filters._update_filter(words, 0);
+        log_filters._update_filter(&words, 0);
         let mut expected = tst_utils::_simple_filter_from_string("aaa qqq ccc sss");
         expected = tst_utils::_add_word_alternative(expected, 0, ".");
         expected = tst_utils::_add_word_alternative(expected, 1, "bbb");
@@ -1273,14 +1277,14 @@ mod tests {
         log_filters.denote_optional = ".".to_string();
         // Add alternative to one word in the middle
         let words = tst_utils::_words_vector_from_string("iii jjj foo lll");
-        log_filters._update_filter(words, 2);
+        log_filters._update_filter(&words, 2);
         let mut expected = tst_utils::_simple_filter_from_string("iii jjj kkk lll");
         expected = tst_utils::_add_word_alternative(expected, 2, "foo");
         assert_eq!(log_filters.filters.get(2).unwrap(), &expected);
         assert_eq!(log_filters.words_hash.get(&"foo".to_string()).unwrap(), &vec![2]);
         // Add alternatives to consequent two words in the middle
         let words = tst_utils::_words_vector_from_string("ttt aaa xyz qwe ccc ddd vvv");
-        log_filters._update_filter(words, 5);
+        log_filters._update_filter(&words, 5);
         let mut expected = tst_utils::_simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv");
         expected = tst_utils::_add_word_alternative(expected, 2, "xyz");
         expected = tst_utils::_add_word_alternative(expected, 3, "qwe");
@@ -1289,7 +1293,7 @@ mod tests {
         assert_eq!(log_filters.words_hash.get(&"qwe".to_string()).unwrap(), &vec![5]);
         // Add alternatives to two non-consequent words in the middle
         let words = tst_utils::_words_vector_from_string("eee fff bar hhh x baz z");
-        log_filters._update_filter(words, 1);
+        log_filters._update_filter(&words, 1);
         let mut expected = tst_utils::_simple_filter_from_string("eee fff ggg hhh x y z");
         expected = tst_utils::_add_word_alternative(expected, 2, "bar");
         expected = tst_utils::_add_word_alternative(expected, 5, "baz");
@@ -1302,20 +1306,20 @@ mod tests {
         log_filters.denote_optional = ".".to_string();
         // Turn one word in the middle to optional alternative
         let words = tst_utils::_words_vector_from_string("ttt aaa bbb ccc ddd vvv");
-        log_filters._update_filter(words, 5);
+        log_filters._update_filter(&words, 5);
         let mut expected = tst_utils::_simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv");
         expected = tst_utils::_add_word_alternative(expected, 2, ".");
         assert_eq!(log_filters.filters.get(5).unwrap(), &expected);
         // Turn two non-consequent words in the middle to optional alternatives
         let words = tst_utils::_words_vector_from_string("eee ggg x y z");
-        log_filters._update_filter(words, 1);
+        log_filters._update_filter(&words, 1);
         let mut expected = tst_utils::_simple_filter_from_string("eee fff ggg hhh x y z");
         expected = tst_utils::_add_word_alternative(expected, 1, ".");
         expected = tst_utils::_add_word_alternative(expected, 3, ".");
         assert_eq!(log_filters.filters.get(1).unwrap(), &expected);
         // Turn one word in the middle to optional alternative
         let words = tst_utils::_words_vector_from_string("iii jjj lll");
-        log_filters._update_filter(words, 2);
+        log_filters._update_filter(&words, 2);
         let mut expected = tst_utils::_simple_filter_from_string("iii jjj kkk lll");
         expected = tst_utils::_add_word_alternative(expected, 2, ".");
         assert_eq!(log_filters.filters.get(2).unwrap(), &expected);
@@ -1325,7 +1329,7 @@ mod tests {
         log_filters.denote_optional = ".".to_string();
         // Last word not matching
         let words = tst_utils::_words_vector_from_string("ttt aaa uuu bbb ccc ddd xyz");
-        log_filters._update_filter(words, 5);
+        log_filters._update_filter(&words, 5);
         let mut expected = tst_utils::_simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv");
         expected = tst_utils::_add_word_alternative(expected, 6, "xyz");
         assert_eq!(log_filters.filters.get(5).unwrap(), &expected);
@@ -1336,7 +1340,7 @@ mod tests {
         log_filters.denote_optional = ".".to_string();
         // Words vector shorter by one word
         let words = tst_utils::_words_vector_from_string("ttt aaa uuu bbb ccc ddd");
-        log_filters._update_filter(words, 5);
+        log_filters._update_filter(&words, 5);
         let mut expected = tst_utils::_simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv");
         expected = tst_utils::_add_word_alternative(expected, 6, ".");
         assert_eq!(log_filters.filters.get(5).unwrap(), &expected);
@@ -1346,7 +1350,7 @@ mod tests {
         log_filters.denote_optional = ".".to_string();
         // Words vector longer by one word
         let words = tst_utils::_words_vector_from_string("ttt aaa uuu bbb ccc ddd vvv xyz");
-        log_filters._update_filter(words, 5);
+        log_filters._update_filter(&words, 5);
         let mut expected = tst_utils::_simple_filter_from_string("ttt aaa uuu bbb ccc ddd vvv xyz");
         expected = tst_utils::_add_word_alternative(expected, 7, ".");
         assert_eq!(log_filters.filters.get(5).unwrap(), &expected);

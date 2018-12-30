@@ -84,10 +84,10 @@ pub fn main() {
         let std_in = io::stdin();
         for line in std_in.lock().lines() {
             let log_line = line.expect("INVALID INPUT!");
-            match log_filters.is_line_known(&log_line) {
-                false => println!("{}", &log_line),
-                true => continue,
+            if log_filters.is_line_known(&log_line) {
+                continue;
             }
+            println!("{}", &log_line);
         }
     }
     if matches.opt_str("s").is_some() {
