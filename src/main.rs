@@ -1,9 +1,9 @@
 extern crate getopts;
 
-use std::io::{self, BufRead};
-use std::process::exit;
-use std::path::Path;
 use std::env;
+use std::io::{self, BufRead};
+use std::path::Path;
+use std::process::exit;
 
 mod logmap;
 
@@ -11,13 +11,31 @@ pub fn main() {
     let args: Vec<String> = env::args().collect();
     let mut opts = getopts::Options::new();
 
-    opts.optopt("l", "load", "Load filters from given path and use to scan logs from input", "PATH");
-    opts.optopt("s", "save", "Save filters under given path, does not work when piping", "PATH");
+    opts.optopt(
+        "l",
+        "load",
+        "Load filters from given path and use to scan logs from input",
+        "PATH",
+    );
+    opts.optopt(
+        "s",
+        "save",
+        "Save filters under given path, does not work when piping",
+        "PATH",
+    );
     opts.optopt("c", "columns", "Ignore first N columns of input\ncolumns are created by splitting line by .,:/[]{}() \'\"\ndefault value: 2\nnote: set this value to a number allowing to ignore time stamp)", "UINT");
     opts.optopt("a", "allowed-alternatives", "during analysis each new line will be allowed not to match N times\ndefault value: 0\nrecommended value when analysing: 1 or 2", "UINT");
     opts.optflag("i", "ignore-numeric", "DO NOT ignore words containing only numbers\ndefault value: true (words containing only values are removed before analysing)");
-    opts.optflag("m", "map", "Map filters from input (extend already loaded filters if -l was used)");
-    opts.optflag("p", "passive", "Works only in conjunction with `l`. Analyse logs using loaded filters.");
+    opts.optflag(
+        "m",
+        "map",
+        "Map filters from input (extend already loaded filters if -l was used)",
+    );
+    opts.optflag(
+        "p",
+        "passive",
+        "Works only in conjunction with `l`. Analyse logs using loaded filters.",
+    );
     opts.optflag("d", "debug", "Print internal data structure");
     opts.optflag("h", "help", "Print this help menu");
 
@@ -40,20 +58,24 @@ pub fn main() {
     log_filters.ignore_numeric_words = true;
 
     if matches.opt_str("c").is_some() {
-        log_filters.ignore_first_columns = match matches.opt_str("c").unwrap()
-        .to_string().parse::<usize>() {
-            Err(_) => panic!("Couldn't parse `columns` to UINT: {}",
-                matches.opt_str("c").unwrap()),
-            Ok(value) => value,
-        };
+        log_filters.ignore_first_columns =
+            match matches.opt_str("c").unwrap().to_string().parse::<usize>() {
+                Err(_) => panic!(
+                    "Couldn't parse `columns` to UINT: {}",
+                    matches.opt_str("c").unwrap()
+                ),
+                Ok(value) => value,
+            };
     }
     if matches.opt_str("a").is_some() {
-        log_filters.max_allowed_new_alternatives = match matches.opt_str("a").unwrap()
-        .to_string().parse::<usize>() {
-            Err(_) => panic!("Couldn't parse `columns` to UINT: {}",
-                matches.opt_str("a").unwrap()),
-            Ok(value) => value,
-        };
+        log_filters.max_allowed_new_alternatives =
+            match matches.opt_str("a").unwrap().to_string().parse::<usize>() {
+                Err(_) => panic!(
+                    "Couldn't parse `columns` to UINT: {}",
+                    matches.opt_str("a").unwrap()
+                ),
+                Ok(value) => value,
+            };
     }
     if matches.opt_str("i").is_some() {
         log_filters.ignore_numeric_words = false;
