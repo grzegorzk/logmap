@@ -43,6 +43,8 @@ If invoked in passive (analysis) mode it will not allow for any non-matching wor
 and print to standard error stream all lines with no matching filter.
 Empty output means there are no unseen logs in the input stream.
 
+Works good.
+
 # Thanks
 Big thank-you to:
 - [Rust team](https://rust-lang.org/)
