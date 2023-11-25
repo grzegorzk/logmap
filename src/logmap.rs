@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -59,11 +58,11 @@ impl LogFilters {
 
         let path_display = path.display();
         let mut file = match File::create(&path) {
-            Err(why) => panic!("Couldn't create {}: {}", path_display, why.description()),
+            Err(why) => panic!("Couldn't create {}: {}", path_display, why.to_string()),
             Ok(file) => file,
         };
         match file.write_all(log_filters_str.as_bytes()) {
-            Err(why) => panic!("Couldn't write to {}: {}", path_display, why.description()),
+            Err(why) => panic!("Couldn't write to {}: {}", path_display, why.to_string()),
             Ok(_) => println!("Successfully wrote to {}", path_display),
         }
     }
@@ -88,7 +87,7 @@ impl LogFilters {
     pub fn load(path: &Path) -> Self {
         let path_display = path.display();
         let mut file = match File::open(&path) {
-            Err(why) => panic!("Couldn't open {}: {}", path_display, why.description()),
+            Err(why) => panic!("Couldn't open {}: {}", path_display, why.to_string()),
             Ok(file) => file,
         };
         let mut log_filters_str = String::new();
@@ -115,7 +114,7 @@ impl LogFilters {
                 Err(why) => panic!(
                     "Couldn't parse 1st line of input to `usize`: {}, {}",
                     log_filters_lines[0],
-                    why.description()
+                    why.to_string()
                 ),
                 Ok(value) => value,
             };
@@ -130,7 +129,7 @@ impl LogFilters {
             Err(why) => panic!(
                 "Couldn't parse 3rd line of input to `bool`: {}, {}",
                 log_filters_lines[2],
-                why.description()
+                why.to_string()
             ),
             Ok(value) => value,
         };
@@ -139,7 +138,7 @@ impl LogFilters {
             Err(why) => panic!(
                 "Couldn't parse 4th line of input to `usize`: {}, {}",
                 log_filters_lines[3],
-                why.description()
+                why.to_string()
             ),
             Ok(value) => value,
         };
@@ -473,7 +472,7 @@ impl LogFilters {
             if words.len() > filter_length && indexes.1 == filter_length as isize - 1 {
                 for extra_word in 0..words.len() - filter_length {
                     {
-                        let mut filter = &mut self.filters[filter_index];
+                        let filter = &mut self.filters[filter_index];
                         filter.push(vec![
                             words[filter_length + extra_word].clone(),
                             self.denote_optional.clone(),

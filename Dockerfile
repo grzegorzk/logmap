@@ -11,7 +11,6 @@ COPY src /opt/logmap/src
 COPY Cargo.toml /opt/logmap/Cargo.toml
 
 RUN cd /opt/logmap \
-    && cargo test --features=tst_utils \
     && cargo build --release
 
 ENTRYPOINT ["/opt/logmap/target/release/logmap"]
