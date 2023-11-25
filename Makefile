@@ -31,3 +31,9 @@ test:
 			&& cargo test --lib --features=tst_utils -- --test-threads=5 \
 			&& cargo test --test learn_line --features=tst_utils -- --test-threads=5 \
 		'
+
+run:
+	@ ${DOCKER} run \
+		-it \
+		--rm \
+		${LOGMAP_IMAGE}

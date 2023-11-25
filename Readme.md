@@ -14,22 +14,25 @@ You will also need `cargo` which should normally be part of `Rust` installation.
 
 # Installation
 
-Build binary from sources:
-`cargo build --release`
+Build podman image containing logmap binary built from sources:
+`make build`
 
-Once built copy binary from following location:
-`./target/release/logmap`
+If you prefer docker:
+`make build DOCKER=docker`
+
+Once image is built:
+`make run`
 
 If you want to you can also run tests to see if everything works as expected:
-`cargo test --features=tst_utils`
+`make test`
 
 # Usage
 
 Analyse logs and save filters to a file (example with systemd):
-`journalctl --since "10 years ago" -nall | ./target/release/logmap -m -s logmap.result`
+`journalctl --since "10 years ago" -nall | make run -m -s logmap.result`
 
 Filter today's logs to see if there is anything that would require attention:
-`journalctl --since "1 day ago" -nall | ./target/release/logmap -l logmap.result -p`
+`journalctl --since "1 day ago" -nall | make run -l logmap.result -p`
 
 # How it works
 
